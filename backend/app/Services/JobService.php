@@ -115,8 +115,8 @@ class JobService
             $query->where('category_id', $criteria['category_id']);
         }
 
-        if (isset($criteria['location'])) {
-            $query->where('location', 'like', '%' . $criteria['location'] . '%');
+        if (isset($criteria['location_id'])) {
+            $query->where('location_id', $criteria['location_id']);
         }
 
         if (isset($criteria['employment_type'])) {
@@ -225,8 +225,9 @@ class JobService
                 ->orderBy('jobs_count', 'desc')
                 ->limit(5)
                 ->get(),
-            'top_locations' => Job::selectRaw('location, COUNT(*) as jobs_count')
-                ->groupBy('location')
+            'top_locations' => Job::join('job_locations', 'jobs.location_id', '=', 'job_locations.id')
+                ->selectRaw('job_locations.city, job_locations.country, COUNT(*) as jobs_count')
+                ->groupBy('job_locations.city', 'job_locations.country')
                 ->orderBy('jobs_count', 'desc')
                 ->limit(5)
                 ->get(),
