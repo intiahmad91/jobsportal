@@ -113,6 +113,7 @@ Route::prefix('jobs')->group(function () {
     Route::get('/', [JobController::class, 'index']);
     Route::get('/featured', [JobController::class, 'featured']);
     Route::get('/premium', [JobController::class, 'premium']);
+    Route::get('/recommended', [JobController::class, 'recommended']);
     Route::get('/stats', [JobController::class, 'stats']);
     Route::get('/{job}', [JobController::class, 'show']);
     Route::get('/company/{companyId}', [JobController::class, 'byCompany']);

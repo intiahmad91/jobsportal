@@ -200,6 +200,17 @@ class JobService
     }
 
     /**
+     * Get recommended jobs.
+     */
+    public function getRecommendedJobs(int $limit = 10): \Illuminate\Database\Eloquent\Collection
+    {
+        return Job::with(['company', 'category', 'location'])
+            ->recommended()
+            ->limit($limit)
+            ->get();
+    }
+
+    /**
      * Get jobs by company.
      */
     public function getJobsByCompany(int $companyId, int $perPage = 15): LengthAwarePaginator

@@ -247,4 +247,26 @@ class Job extends Model
                           ->orWhere('application_deadline', '>', now());
                     });
     }
+
+    /**
+     * Scope a query to only include recommended jobs.
+     * Recommended jobs are active jobs with high views/applications ratio or recent jobs.
+     */
+    public function scopeRecommended($query)
+    {
+        return $query->where('status', 'active')
+                    ->where('positions_available', '>', 0)
+                    ->where(function($q) {
+                        $q->whereNull('application_deadline')
+                          ->orWhere('application_deadline', '>', now());
+                    })
+                    ->where(function($q) {
+                        // Jobs with high engagement (views/applications ratio)
+                        $q->whereRaw('views_count > 0 AND applications_count > 0')
+                          ->orWhere('views_count', '>', 10)
+                          ->orWhere('created_at', '>', now()->subDays(7)); // Recent jobs within 7 days
+                    })
+                    ->orderByRaw('(views_count + applications_count) DESC')
+                    ->orderBy('created_at', 'desc');
+    }
 }

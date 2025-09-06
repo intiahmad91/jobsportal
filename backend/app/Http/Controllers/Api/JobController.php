@@ -389,6 +389,27 @@ class JobController extends Controller
     }
 
     /**
+     * Get recommended jobs.
+     */
+    public function recommended(Request $request): JsonResponse
+    {
+        try {
+            $limit = $request->get('limit', 10);
+            $jobs = $this->jobService->getRecommendedJobs($limit);
+            
+            return response()->json([
+                'success' => true,
+                'data' => JobResource::collection($jobs),
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
      * Get jobs by company.
      */
     public function byCompany(Request $request, int $companyId): JsonResponse
