@@ -17,6 +17,10 @@ class DatabaseSeeder extends Seeder
             CompanySeeder::class,
             JobLocationSeeder::class,
             SkillSeeder::class,
+            JobSeekerSeeder::class,
+            ExperienceSeeder::class,
+            EducationSeeder::class,
+            CertificationSeeder::class,
             JobSeeder::class,
         ]);
     }

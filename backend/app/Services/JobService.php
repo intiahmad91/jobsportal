@@ -103,7 +103,7 @@ class JobService
      */
     public function searchJobs(array $criteria, int $perPage = 15): LengthAwarePaginator
     {
-        $query = Job::with(['company', 'category', 'skills'])
+        $query = Job::with(['company', 'category', 'location', 'skills'])
             ->acceptingApplications();
 
         // Apply filters

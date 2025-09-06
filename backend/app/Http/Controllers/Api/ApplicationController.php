@@ -101,7 +101,7 @@ class ApplicationController extends Controller
                     'job_title' => $job->title,
                     'company_name' => $job->company ? $job->company->name : 'N/A',
                     'status' => $application->status,
-                    'applied_at' => $application->applied_at->format('Y-m-d H:i:s')
+                    'applied_at' => $application->applied_at ? $application->applied_at->format('Y-m-d H:i:s') : $application->created_at->format('Y-m-d H:i:s')
                 ]
             ], 201);
 

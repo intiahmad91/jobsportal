@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class UserProfile extends Model
 {
@@ -41,6 +42,10 @@ class UserProfile extends Model
         'preferred_job_types',
         'preferred_locations',
         'preferred_industries',
+        'cv_path',
+        'cv_original_name',
+        'cv_size',
+        'cv_mime_type',
     ];
 
     /**
@@ -63,6 +68,14 @@ class UserProfile extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Get the skills for the user profile.
+     */
+    public function skills(): BelongsToMany
+    {
+        return $this->belongsToMany(Skill::class, 'user_skills', 'user_id', 'skill_id');
     }
 
     /**

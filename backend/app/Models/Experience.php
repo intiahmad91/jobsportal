@@ -10,6 +10,8 @@ class Experience extends Model
 {
     use HasFactory;
 
+    protected $table = 'experiences';
+
     protected $fillable = [
         'user_id',
         'title',

@@ -105,6 +105,14 @@ class User extends Authenticatable
     }
 
     /**
+     * Get the user's resumes.
+     */
+    public function resumes(): HasMany
+    {
+        return $this->hasMany(Resume::class);
+    }
+
+    /**
      * Get the user's skills.
      */
     public function skills()
