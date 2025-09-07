@@ -40,6 +40,9 @@ Route::get('/test', function () {
 // Admin dashboard route (temporarily without auth for testing)
 Route::get('/admin/dashboard', [App\Http\Controllers\Api\AdminController::class, 'dashboard']);
 
+// Employer dashboard route (temporarily without auth for testing)
+Route::get('/user/dashboard/employer', [App\Http\Controllers\Api\UserController::class, 'employerDashboard']);
+
 // Simple echo route to test request handling
 Route::post('/echo', function (Illuminate\Http\Request $request) {
     return response()->json([
@@ -135,6 +138,14 @@ Route::prefix('job-seekers')->group(function () {
     Route::get('/', [JobSeekerController::class, 'index']);
     Route::get('/featured', [JobSeekerController::class, 'featured']);
     Route::get('/{id}', [JobSeekerController::class, 'show']);
+});
+
+// Public categories routes
+Route::get('/categories', function () {
+    return response()->json([
+        'success' => true,
+        'data' => \App\Models\JobCategory::active()->ordered()->get()
+    ]);
 });
 
 // Protected routes (require authentication)

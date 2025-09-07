@@ -9,6 +9,8 @@ use App\Models\UserProfile;
 use App\Models\Job;
 use App\Models\Company;
 use App\Models\JobApplication;
+use App\Models\JobView;
+use App\Models\ActivityLog;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 
@@ -854,6 +856,173 @@ class UserController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to fetch dashboard data: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get dashboard data for employer
+     */
+    public function employerDashboard(Request $request)
+    {
+        try {
+            $user = $request->user();
+            
+            // For testing without auth, use first company data
+            if (!$user) {
+                $company = Company::first();
+                if (!$company) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'No company found'
+                    ], 404);
+                }
+            } else {
+                $company = $user->company;
+                if (!$company) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Company not found'
+                    ], 404);
+                }
+            }
+
+            // Get job statistics
+            $totalJobs = Job::where('company_id', $company->id)->count();
+            $activeJobs = Job::where('company_id', $company->id)->where('status', 'active')->count();
+            $totalApplications = JobApplication::whereHas('job', function($query) use ($company) {
+                $query->where('company_id', $company->id);
+            })->count();
+            $pendingApplications = JobApplication::whereHas('job', function($query) use ($company) {
+                $query->where('company_id', $company->id);
+            })->where('status', 'pending')->count();
+            $approvedApplications = JobApplication::whereHas('job', function($query) use ($company) {
+                $query->where('company_id', $company->id);
+            })->where('status', 'approved')->count();
+            $rejectedApplications = JobApplication::whereHas('job', function($query) use ($company) {
+                $query->where('company_id', $company->id);
+            })->where('status', 'rejected')->count();
+
+            // Get recent jobs (last 5)
+            $recentJobs = Job::with(['location', 'category'])
+                ->where('company_id', $company->id)
+                ->latest()
+                ->limit(5)
+                ->get()
+                ->map(function($job) {
+                    $applicationsCount = JobApplication::where('job_id', $job->id)->count();
+                    return [
+                        'id' => $job->id,
+                        'title' => $job->title,
+                        'location' => $job->location ? $job->location->city . ', ' . $job->location->state : 'Location not specified',
+                        'salary' => $this->formatSalary($job->salary_min, $job->salary_max, $job->salary_currency, $job->salary_period),
+                        'type' => ucfirst($job->employment_type),
+                        'status' => ucfirst($job->status),
+                        'postedAt' => $job->created_at->diffForHumans(),
+                        'applications' => $applicationsCount,
+                        'views' => rand(50, 500) // Mock views for now
+                    ];
+                });
+
+            // Get recent applications (last 10)
+            $recentApplications = JobApplication::with(['user.profile', 'job'])
+                ->whereHas('job', function($query) use ($company) {
+                    $query->where('company_id', $company->id);
+                })
+                ->latest()
+                ->limit(10)
+                ->get()
+                ->map(function($app) {
+                    return [
+                        'id' => $app->id,
+                        'jobTitle' => $app->job->title ?? 'N/A',
+                        'candidateName' => $app->user->profile->first_name . ' ' . $app->user->profile->last_name ?? 'N/A',
+                        'candidateEmail' => $app->user->email ?? 'N/A',
+                        'status' => ucfirst($app->status),
+                        'appliedAt' => $app->created_at->diffForHumans(),
+                        'experience' => $app->user->profile->experience_level ?? 'Not specified',
+                        'skills' => $app->user->skills()->pluck('name')->take(3)->toArray()
+                    ];
+                });
+
+            // Get top skills from job applications
+            $topSkills = JobApplication::whereHas('job', function($query) use ($company) {
+                $query->where('company_id', $company->id);
+            })
+            ->with('user.skills')
+            ->get()
+            ->flatMap(function($app) {
+                return $app->user->skills;
+            })
+            ->groupBy('name')
+            ->map(function($skills, $name) {
+                return [
+                    'skill' => $name,
+                    'count' => $skills->count(),
+                    'growth' => rand(5, 25) // Mock growth for now
+                ];
+            })
+            ->sortByDesc('count')
+            ->take(5)
+            ->values();
+
+            // Get real view counts from job_views table
+            $monthlyViews = JobView::whereHas('job', function($query) use ($company) {
+                $query->where('company_id', $company->id);
+            })->where('viewed_at', '>=', now()->subDays(30))->count();
+            
+            $profileViews = JobView::whereHas('job', function($query) use ($company) {
+                $query->where('company_id', $company->id);
+            })->where('viewed_at', '>=', now()->subDays(7))->count();
+
+            // Get real activity logs
+            $recentActivity = ActivityLog::where('company_id', $company->id)
+                ->latest('activity_at')
+                ->limit(5)
+                ->get()
+                ->map(function($log) {
+                    return [
+                        'id' => $log->id,
+                        'type' => $log->type,
+                        'description' => $log->description,
+                        'timestamp' => $log->activity_at->diffForHumans(),
+                        'user' => $log->user_name,
+                        'icon' => $log->icon
+                    ];
+                });
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'totalJobs' => $totalJobs,
+                    'activeJobs' => $activeJobs,
+                    'totalApplications' => $totalApplications,
+                    'pendingApplications' => $pendingApplications,
+                    'approvedApplications' => $approvedApplications,
+                    'rejectedApplications' => $rejectedApplications,
+                    'monthlyViews' => $monthlyViews,
+                    'profileViews' => $profileViews,
+                    'recentJobs' => $recentJobs,
+                    'recentApplications' => $recentApplications,
+                    'topSkills' => $topSkills,
+                    'recentActivity' => $recentActivity,
+                    'companyInfo' => [
+                        'name' => $company->name,
+                        'industry' => $company->industry ?? 'Technology',
+                        'size' => $company->company_size ?? '50-200 employees',
+                        'location' => $company->address ?? 'Location not specified',
+                        'website' => $company->website ?? 'Website not specified',
+                        'description' => $company->description ?? 'Company description not available',
+                        'rating' => 4.5, // Mock rating
+                        'totalReviews' => rand(20, 100) // Mock reviews
+                    ]
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch employer dashboard data: ' . $e->getMessage()
             ], 500);
         }
     }
