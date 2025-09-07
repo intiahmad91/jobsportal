@@ -76,7 +76,14 @@ class UserController extends Controller
                 'status' => ['required', Rule::in(['active', 'pending', 'inactive'])],
                 'bio' => 'nullable|string',
                 'location' => 'nullable|string|max:255',
-                'experience_level' => 'nullable|string|in:entry,junior,mid,senior,expert'
+                'experience_level' => 'nullable|string|in:entry,junior,mid,senior,expert',
+                // Company fields (optional)
+                'companyName' => 'nullable|string|max:255',
+                'description' => 'nullable|string',
+                'website' => 'nullable|url',
+                'industry' => 'nullable|string|max:255',
+                'companySize' => 'nullable|string|max:255',
+                'foundedYear' => 'nullable|integer|min:1800|max:' . date('Y')
             ]);
 
             // Create the user
@@ -100,8 +107,23 @@ class UserController extends Controller
                 'open_to_work' => $validated['user_type'] === 'jobseeker'
             ]);
 
-            // Load the profile relationship
-            $user->load('profile');
+            // If creating an employer, also create a company record
+            if ($validated['user_type'] === 'employer') {
+                Company::create([
+                    'user_id' => $user->id,
+                    'name' => $validated['companyName'] ?? $validated['name'] . ' Company',
+                    'description' => $validated['description'] ?? '',
+                    'website' => $validated['website'] ?? '',
+                    'email' => $validated['email'],
+                    'phone' => $validated['phone'] ?? null,
+                    'industry' => $validated['industry'] ?? '',
+                    'size' => $validated['companySize'] ?? '',
+                    'founded_year' => $validated['foundedYear'] ?? null,
+                ]);
+            }
+
+            // Load the profile and company relationships
+            $user->load(['profile', 'company']);
 
             return response()->json([
                 'success' => true,

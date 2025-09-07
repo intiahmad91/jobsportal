@@ -39,6 +39,9 @@ Route::get('/test', function () {
     ]);
 });
 
+// Temporary test route for creating users (without auth for testing)
+Route::post('/test-create-user', [UserController::class, 'store']);
+
 // Admin dashboard route (temporarily without auth for testing)
 Route::get('/admin/dashboard', [App\Http\Controllers\Api\AdminController::class, 'dashboard']);
 
