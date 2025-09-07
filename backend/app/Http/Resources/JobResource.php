@@ -14,6 +14,50 @@ class JobResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        return parent::toArray($request);
+        return [
+            'id' => $this->id,
+            'title' => $this->title,
+            'description' => $this->description,
+            'requirements' => $this->requirements,
+            'benefits' => $this->benefits,
+            'salary_min' => $this->salary_min,
+            'salary_max' => $this->salary_max,
+            'salary_type' => $this->salary_type,
+            'employment_type' => $this->employment_type,
+            'experience_level' => $this->experience_level,
+            'status' => $this->status,
+            'is_featured' => $this->is_featured,
+            'is_premium' => $this->is_premium,
+            'views_count' => $this->views_count,
+            'applications_count' => $this->applications_count ?? 0,
+            'deadline' => $this->deadline,
+            'created_at' => $this->created_at,
+            'updated_at' => $this->updated_at,
+            'company' => $this->whenLoaded('company', function () {
+                return [
+                    'id' => $this->company->id,
+                    'name' => $this->company->name,
+                    'logo' => $this->company->logo,
+                    'website' => $this->company->website,
+                ];
+            }),
+            'category' => $this->whenLoaded('category', function () {
+                return [
+                    'id' => $this->category->id,
+                    'name' => $this->category->name,
+                    'slug' => $this->category->slug,
+                ];
+            }),
+            'location' => $this->whenLoaded('location', function () {
+                return [
+                    'id' => $this->location->id,
+                    'name' => $this->location->name,
+                    'city' => $this->location->city,
+                    'state' => $this->location->state,
+                    'country' => $this->location->country,
+                    'slug' => $this->location->slug,
+                ];
+            }),
+        ];
     }
 }

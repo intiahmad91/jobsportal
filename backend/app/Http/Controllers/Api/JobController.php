@@ -50,7 +50,7 @@ class JobController extends Controller
     public function adminIndex(Request $request): JsonResponse
     {
         try {
-            $query = Job::with(['company', 'user', 'category']);
+            $query = Job::with(['company', 'user', 'category', 'location']);
             
             // Search functionality
             if ($request->has('search')) {

@@ -6,6 +6,8 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\JobController;
 use App\Http\Controllers\Api\CompanyController;
+use App\Http\Controllers\Api\AnalyticsController;
+use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\ApplicationController;
 use App\Http\Controllers\Api\JobSeekerController;
 use App\Http\Controllers\Api\ResumeController;
@@ -40,8 +42,6 @@ Route::get('/test', function () {
 // Admin dashboard route (temporarily without auth for testing)
 Route::get('/admin/dashboard', [App\Http\Controllers\Api\AdminController::class, 'dashboard']);
 
-// Employer dashboard route (temporarily without auth for testing)
-Route::get('/user/dashboard/employer', [App\Http\Controllers\Api\UserController::class, 'employerDashboard']);
 
 // Simple echo route to test request handling
 Route::post('/echo', function (Illuminate\Http\Request $request) {
@@ -168,16 +168,17 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/cv', [UserController::class, 'uploadCV']);
         Route::get('/cv', [UserController::class, 'getCV']);
         Route::delete('/cv', [UserController::class, 'deleteCV']);
+        Route::get('/dashboard/jobseeker', [UserController::class, 'jobseekerDashboard']);
+        Route::get('/dashboard/employer', [UserController::class, 'employerDashboard']);
         Route::get('/dashboard', [UserController::class, 'dashboard']);
         Route::get('/applications', [UserController::class, 'applications']);
         Route::get('/saved-jobs', [UserController::class, 'savedJobs']);
         Route::post('/save-job/{job}', [UserController::class, 'saveJob']);
         Route::delete('/save-job/{job}', [UserController::class, 'unsaveJob']);
-        Route::get('/dashboard/jobseeker', [UserController::class, 'jobseekerDashboard']);
     });
 
     // Job management routes (employers only)
-    Route::middleware('can:post_jobs')->prefix('jobs')->group(function () {
+    Route::prefix('jobs')->group(function () {
         Route::post('/', [JobController::class, 'store']);
         Route::put('/{job}', [JobController::class, 'update']);
         Route::delete('/{job}', [JobController::class, 'destroy']);
@@ -187,11 +188,23 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     // Company management routes (employers only)
-    Route::middleware('can:manage_company')->prefix('companies')->group(function () {
+    Route::prefix('my-company')->group(function () {
+        Route::get('/', [CompanyController::class, 'show']);
         Route::post('/', [CompanyController::class, 'store']);
-        Route::put('/{company}', [CompanyController::class, 'update']);
-        Route::post('/{company}/logo', [CompanyController::class, 'uploadLogo']);
-        Route::post('/{company}/verify', [CompanyController::class, 'verify']);
+        Route::put('/', [CompanyController::class, 'update']);
+        Route::post('/logo', [CompanyController::class, 'uploadLogo']);
+        Route::post('/verify', [CompanyController::class, 'verify']);
+    });
+
+    // Analytics routes (employers only)
+    Route::prefix('analytics')->group(function () {
+        Route::get('/employer', [AnalyticsController::class, 'getEmployerAnalytics']);
+    });
+
+    // Settings routes (employers only)
+    Route::prefix('settings')->group(function () {
+        Route::get('/employer', [SettingsController::class, 'getEmployerSettings']);
+        Route::put('/employer', [SettingsController::class, 'updateEmployerSettings']);
     });
 
     // Job application routes

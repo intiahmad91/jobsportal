@@ -17,6 +17,23 @@ class JobService
     public function createJob(array $data): Job
     {
         return DB::transaction(function () use ($data) {
+            // Handle location - if location string is provided, find or create location
+            $locationId = 1; // Default location ID
+            if (isset($data['location']) && !empty($data['location'])) {
+                $location = \App\Models\JobLocation::firstOrCreate(
+                    ['city' => $data['location']],
+                    [
+                        'state' => '', 
+                        'country' => 'USA', 
+                        'status' => 'active',
+                        'slug' => \Illuminate\Support\Str::slug($data['location'])
+                    ]
+                );
+                $locationId = $location->id;
+            } elseif (isset($data['location_id'])) {
+                $locationId = $data['location_id'];
+            }
+            
             $job = Job::create([
                 'company_id' => $data['company_id'],
                 'user_id' => $data['user_id'],
@@ -26,7 +43,7 @@ class JobService
                 'responsibilities' => $data['responsibilities'] ?? null,
                 'benefits' => $data['benefits'] ?? null,
                 'category_id' => $data['category_id'],
-                'location_id' => $data['location_id'],
+                'location_id' => $locationId,
                 'employment_type' => $data['employment_type'],
                 'experience_level' => $data['experience_level'],
                 'min_salary' => $data['min_salary'] ?? null,
@@ -215,7 +232,7 @@ class JobService
      */
     public function getJobsByCompany(int $companyId, int $perPage = 15): LengthAwarePaginator
     {
-        return Job::with(['category'])
+        return Job::with(['category', 'company', 'location'])
             ->where('company_id', $companyId)
             ->orderBy('created_at', 'desc')
             ->paginate($perPage);
