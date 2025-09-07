@@ -5,6 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\JobApplication;
+use App\Models\Job;
+use App\Models\User;
+use App\Models\JobCategory;
 
 class ApplicationController extends Controller
 {
@@ -141,5 +144,344 @@ class ApplicationController extends Controller
     public function destroy(string $id)
     {
         //
+    }
+
+    /**
+     * Admin: Get all applications with detailed information
+     */
+    public function adminIndex(Request $request)
+    {
+        try {
+            $query = JobApplication::with(['user.profile', 'job.company', 'job.location']);
+
+            // Search functionality
+            if ($request->has('search')) {
+                $search = $request->search;
+                $query->where(function($q) use ($search) {
+                    $q->whereHas('user', function($userQuery) use ($search) {
+                        $userQuery->where('name', 'like', "%{$search}%")
+                                  ->orWhere('email', 'like', "%{$search}%");
+                    })->orWhereHas('job', function($jobQuery) use ($search) {
+                        $jobQuery->where('title', 'like', "%{$search}%");
+                    });
+                });
+            }
+
+            // Filter by status
+            if ($request->has('status') && $request->status !== 'all') {
+                $query->where('status', $request->status);
+            }
+
+            // Filter by job
+            if ($request->has('job_id') && $request->job_id !== 'all') {
+                $query->where('job_id', $request->job_id);
+            }
+
+            $applications = $query->latest()->paginate(15);
+
+            $formattedApplications = $applications->map(function($application) {
+                return [
+                    'id' => $application->id,
+                    'jobTitle' => $application->job ? $application->job->title : 'Unknown Job',
+                    'jobId' => $application->job_id,
+                    'candidateName' => $application->user ? $application->user->name : 'Unknown User',
+                    'candidateEmail' => $application->user ? $application->user->email : 'Unknown Email',
+                    'candidatePhone' => $application->user && $application->user->profile ? $application->user->profile->phone : 'Not provided',
+                    'experience' => $application->user && $application->user->profile ? $application->user->profile->experience_level : 'Not specified',
+                    'skills' => $application->user && $application->user->profile ? 
+                        explode(',', $application->user->profile->skills ?? '') : [],
+                    'status' => ucfirst($application->status ?? 'pending'),
+                    'appliedAt' => $application->created_at->format('Y-m-d'),
+                    'resumeUrl' => $application->user && $application->user->profile ? $application->user->profile->cv_path : null,
+                    'coverLetter' => $application->cover_letter ?? 'No cover letter provided',
+                    'expectedSalary' => $application->expected_salary ?? 'Not specified',
+                    'availability' => $application->availability ?? 'Not specified',
+                    'company' => $application->job && $application->job->company ? $application->job->company->name : 'Unknown Company',
+                    'location' => $application->job && $application->job->location ? 
+                        $application->job->location->city . ', ' . $application->job->location->country : 'Not specified',
+                    'jobType' => $application->job ? $application->job->employment_type : 'Not specified',
+                    'notes' => $application->notes ?? 'No notes',
+                    'avatar' => $application->user && $application->user->profile ? $application->user->profile->avatar : null
+                ];
+            });
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'applications' => $formattedApplications,
+                    'pagination' => [
+                        'current_page' => $applications->currentPage(),
+                        'last_page' => $applications->lastPage(),
+                        'per_page' => $applications->perPage(),
+                        'total' => $applications->total()
+                    ]
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch applications: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Admin: Get application statistics
+     */
+    public function adminStats()
+    {
+        try {
+            $totalApplications = JobApplication::count();
+            $pendingApplications = JobApplication::where('status', 'pending')->count();
+            $approvedApplications = JobApplication::where('status', 'approved')->count();
+            $rejectedApplications = JobApplication::where('status', 'rejected')->count();
+            $hiredApplications = JobApplication::where('status', 'hired')->count();
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'total' => $totalApplications,
+                    'pending' => $pendingApplications,
+                    'approved' => $approvedApplications,
+                    'rejected' => $rejectedApplications,
+                    'hired' => $hiredApplications
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch application statistics: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Admin: Update application
+     */
+    public function adminUpdate(Request $request, $id)
+    {
+        try {
+            $application = JobApplication::findOrFail($id);
+            
+            $validated = $request->validate([
+                'status' => 'sometimes|in:pending,approved,rejected,hired,interview_scheduled',
+                'notes' => 'sometimes|string|max:1000'
+            ]);
+
+            $application->update($validated);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Application updated successfully',
+                'data' => $application
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update application: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Admin: Delete application
+     */
+    public function adminDestroy($id)
+    {
+        try {
+            $application = JobApplication::findOrFail($id);
+            $application->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Application deleted successfully'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete application: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Employer: Get applications for employer's jobs
+     */
+    public function employerIndex(Request $request)
+    {
+        try {
+            $employer = $request->user();
+            
+            // Get employer's job IDs
+            $employerJobIds = Job::where('user_id', $employer->id)->pluck('id')->toArray();
+            
+            if (empty($employerJobIds)) {
+                return response()->json([
+                    'success' => true,
+                    'data' => [
+                        'applications' => [],
+                        'pagination' => [
+                            'current_page' => 1,
+                            'last_page' => 1,
+                            'per_page' => 15,
+                            'total' => 0
+                        ]
+                    ]
+                ]);
+            }
+
+            $query = JobApplication::with(['user.profile', 'job.company', 'job.location'])
+                ->whereIn('job_id', $employerJobIds);
+
+            // Search functionality
+            if ($request->has('search')) {
+                $search = $request->search;
+                $query->where(function($q) use ($search) {
+                    $q->whereHas('user', function($userQuery) use ($search) {
+                        $userQuery->where('name', 'like', "%{$search}%")
+                                  ->orWhere('email', 'like', "%{$search}%");
+                    })->orWhereHas('job', function($jobQuery) use ($search) {
+                        $jobQuery->where('title', 'like', "%{$search}%");
+                    });
+                });
+            }
+
+            // Filter by status
+            if ($request->has('status') && $request->status !== 'all') {
+                $query->where('status', $request->status);
+            }
+
+            // Filter by job
+            if ($request->has('job_id') && $request->job_id !== 'all') {
+                $query->where('job_id', $request->job_id);
+            }
+
+            $applications = $query->latest()->paginate(15);
+
+            $formattedApplications = $applications->map(function($application) {
+                return [
+                    'id' => $application->id,
+                    'jobTitle' => $application->job ? $application->job->title : 'Unknown Job',
+                    'jobId' => $application->job_id,
+                    'candidateName' => $application->user ? $application->user->name : 'Unknown User',
+                    'candidateEmail' => $application->user ? $application->user->email : 'Unknown Email',
+                    'candidatePhone' => $application->user && $application->user->profile ? $application->user->profile->phone : 'Not provided',
+                    'experience' => $application->user && $application->user->profile ? $application->user->profile->experience_level : 'Not specified',
+                    'skills' => $application->user && $application->user->profile ? 
+                        explode(',', $application->user->profile->skills ?? '') : [],
+                    'status' => ucfirst($application->status ?? 'pending'),
+                    'appliedAt' => $application->created_at->format('Y-m-d'),
+                    'resumeUrl' => $application->user && $application->user->profile ? $application->user->profile->cv_path : null,
+                    'coverLetter' => $application->cover_letter ?? 'No cover letter provided',
+                    'expectedSalary' => $application->expected_salary ?? 'Not specified',
+                    'availability' => $application->availability ?? 'Not specified',
+                    'education' => $application->user && $application->user->profile ? $application->user->profile->education : 'Not specified',
+                    'location' => $application->user && $application->user->profile ? $application->user->profile->location : 'Not specified',
+                    'rating' => $application->rating ?? 0,
+                    'notes' => $application->notes ?? 'No notes',
+                    'avatar' => $application->user && $application->user->profile ? $application->user->profile->avatar : null
+                ];
+            });
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'applications' => $formattedApplications,
+                    'pagination' => [
+                        'current_page' => $applications->currentPage(),
+                        'last_page' => $applications->lastPage(),
+                        'per_page' => $applications->perPage(),
+                        'total' => $applications->total()
+                    ]
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch applications: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Employer: Get application statistics
+     */
+    public function employerStats(Request $request)
+    {
+        try {
+            $employer = $request->user();
+            
+            // Get employer's job IDs
+            $employerJobIds = Job::where('user_id', $employer->id)->pluck('id')->toArray();
+            
+            if (empty($employerJobIds)) {
+                return response()->json([
+                    'success' => true,
+                    'data' => [
+                        'total' => 0,
+                        'pending' => 0,
+                        'approved' => 0,
+                        'rejected' => 0,
+                        'hired' => 0
+                    ]
+                ]);
+            }
+
+            $totalApplications = JobApplication::whereIn('job_id', $employerJobIds)->count();
+            $pendingApplications = JobApplication::whereIn('job_id', $employerJobIds)->where('status', 'pending')->count();
+            $approvedApplications = JobApplication::whereIn('job_id', $employerJobIds)->where('status', 'approved')->count();
+            $rejectedApplications = JobApplication::whereIn('job_id', $employerJobIds)->where('status', 'rejected')->count();
+            $hiredApplications = JobApplication::whereIn('job_id', $employerJobIds)->where('status', 'hired')->count();
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'total' => $totalApplications,
+                    'pending' => $pendingApplications,
+                    'approved' => $approvedApplications,
+                    'rejected' => $rejectedApplications,
+                    'hired' => $hiredApplications
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch application statistics: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Employer: Update application
+     */
+    public function employerUpdate(Request $request, $id)
+    {
+        try {
+            $employer = $request->user();
+            
+            // Get employer's job IDs
+            $employerJobIds = Job::where('user_id', $employer->id)->pluck('id')->toArray();
+            
+            $application = JobApplication::whereIn('job_id', $employerJobIds)->findOrFail($id);
+            
+            $validated = $request->validate([
+                'status' => 'sometimes|in:pending,reviewed,shortlisted,interviewed,offered,rejected,withdrawn',
+                'employer_notes' => 'sometimes|string|max:1000',
+                'rating' => 'sometimes|numeric|min:1|max:5'
+            ]);
+
+            $application->update($validated);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Application updated successfully',
+                'data' => $application
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update application: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }

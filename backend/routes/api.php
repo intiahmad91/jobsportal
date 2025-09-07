@@ -39,8 +39,6 @@ Route::get('/test', function () {
     ]);
 });
 
-// Temporary test route for creating users (without auth for testing)
-Route::post('/test-create-user', [UserController::class, 'store']);
 
 // Admin dashboard route (temporarily without auth for testing)
 Route::get('/admin/dashboard', [App\Http\Controllers\Api\AdminController::class, 'dashboard']);
@@ -190,6 +188,16 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/{job}/close', [JobController::class, 'close']);
     });
 
+    // Application management routes (employers only)
+    Route::prefix('my-applications')->group(function () {
+        Route::get('/', [ApplicationController::class, 'employerIndex']);
+        Route::get('/stats', [ApplicationController::class, 'employerStats']);
+        Route::put('/{application}', [ApplicationController::class, 'employerUpdate']);
+        Route::post('/{application}/status', [ApplicationController::class, 'updateStatus']);
+        Route::post('/{application}/notes', [ApplicationController::class, 'addNotes']);
+        Route::post('/{application}/rating', [ApplicationController::class, 'addRating']);
+    });
+
     // Company management routes (employers only)
     Route::prefix('my-company')->group(function () {
         Route::get('/', [CompanyController::class, 'show']);
@@ -254,6 +262,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/companies/{company}', [CompanyController::class, 'adminUpdate']);
         Route::delete('/companies/{company}', [CompanyController::class, 'adminDestroy']);
         Route::put('/companies/{company}/verify', [CompanyController::class, 'adminVerify']);
+        
+        Route::get('/applications', [ApplicationController::class, 'adminIndex']);
+        Route::get('/applications/stats', [ApplicationController::class, 'adminStats']);
+        Route::put('/applications/{application}', [ApplicationController::class, 'adminUpdate']);
+        Route::delete('/applications/{application}', [ApplicationController::class, 'adminDestroy']);
         
         Route::get('/statistics', [UserController::class, 'statistics']);
         Route::get('/analytics', [UserController::class, 'analytics']);
