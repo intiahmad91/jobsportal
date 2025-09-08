@@ -484,4 +484,35 @@ class ApplicationController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Delete an application (employer only)
+     */
+    public function employerDestroy($id)
+    {
+        try {
+            $application = JobApplication::findOrFail($id);
+            
+            // Check if the authenticated user is the employer who posted the job
+            $user = auth()->user();
+            if (!$user || $application->job->user_id !== $user->id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized to delete this application'
+                ], 403);
+            }
+            
+            $application->delete();
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Application deleted successfully'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete application: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }

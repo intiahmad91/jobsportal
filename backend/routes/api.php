@@ -193,6 +193,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/', [ApplicationController::class, 'employerIndex']);
         Route::get('/stats', [ApplicationController::class, 'employerStats']);
         Route::put('/{application}', [ApplicationController::class, 'employerUpdate']);
+        Route::delete('/{application}', [ApplicationController::class, 'employerDestroy']);
         Route::post('/{application}/status', [ApplicationController::class, 'updateStatus']);
         Route::post('/{application}/notes', [ApplicationController::class, 'addNotes']);
         Route::post('/{application}/rating', [ApplicationController::class, 'addRating']);
