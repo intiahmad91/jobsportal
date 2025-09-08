@@ -144,7 +144,7 @@ class UserController extends Controller
     public function show(string $id)
     {
         try {
-            $user = User::findOrFail($id);
+            $user = User::with('profile')->findOrFail($id);
             
             return response()->json([
                 'success' => true,
@@ -169,12 +169,49 @@ class UserController extends Controller
             $validated = $request->validate([
                 'name' => 'sometimes|string|max:255',
                 'email' => ['sometimes', 'email', Rule::unique('users')->ignore($id)],
-                'user_type' => ['sometimes', Rule::in(['jobseeker', 'employer'])],
+                'user_type' => ['sometimes', Rule::in(['jobseeker', 'employer', 'admin'])],
                 'phone' => 'nullable|string|max:20',
-                'status' => ['sometimes', Rule::in(['active', 'pending', 'inactive'])]
+                'status' => ['sometimes', Rule::in(['active', 'pending', 'inactive'])],
+                'bio' => 'nullable|string|max:1000',
+                'first_name' => 'nullable|string|max:255',
+                'last_name' => 'nullable|string|max:255',
+                'location' => 'nullable|string|max:255',
+                'experience_level' => ['nullable', Rule::in(['entry', 'junior', 'mid', 'senior', 'expert'])],
+                'open_to_work' => 'nullable|boolean'
             ]);
 
-            $user->update($validated);
+            // Update user basic info
+            $user->update([
+                'name' => $validated['name'] ?? $user->name,
+                'email' => $validated['email'] ?? $user->email,
+            ]);
+
+            // Update or create profile
+            $profileData = [
+                'user_type' => $validated['user_type'] ?? $user->profile?->user_type,
+                'status' => $validated['status'] ?? $user->profile?->status,
+                'phone' => $validated['phone'] ?? $user->profile?->phone,
+                'bio' => $validated['bio'] ?? $user->profile?->bio,
+                'first_name' => $validated['first_name'] ?? $user->profile?->first_name,
+                'last_name' => $validated['last_name'] ?? $user->profile?->last_name,
+                'location' => $validated['location'] ?? $user->profile?->location,
+                'experience_level' => $validated['experience_level'] ?? $user->profile?->experience_level,
+                'open_to_work' => $validated['open_to_work'] ?? $user->profile?->open_to_work ?? false,
+            ];
+
+            // Remove null values
+            $profileData = array_filter($profileData, function($value) {
+                return $value !== null;
+            });
+
+            if ($user->profile) {
+                $user->profile->update($profileData);
+            } else {
+                $user->profile()->create($profileData);
+            }
+
+            // Reload user with profile
+            $user->load('profile');
 
             return response()->json([
                 'success' => true,
