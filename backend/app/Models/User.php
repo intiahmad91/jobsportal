@@ -122,6 +122,11 @@ class User extends Authenticatable
             ->withTimestamps();
     }
 
+    public function savedJobs(): HasMany
+    {
+        return $this->hasMany(SavedJob::class);
+    }
+
     /**
      * Check if user is an employer.
      */

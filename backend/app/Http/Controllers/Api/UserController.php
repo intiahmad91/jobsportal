@@ -11,6 +11,7 @@ use App\Models\Company;
 use App\Models\JobApplication;
 use App\Models\JobView;
 use App\Models\ActivityLog;
+use App\Models\SavedJob;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 
@@ -1152,6 +1153,141 @@ class UserController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to fetch applications',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get user's saved jobs
+     */
+    public function savedJobs(Request $request)
+    {
+        try {
+            $user = $request->user();
+            
+            $savedJobs = SavedJob::with(['job.company', 'job.location', 'job.skills'])
+                ->where('user_id', $user->id)
+                ->orderBy('saved_at', 'desc')
+                ->get()
+                ->map(function ($savedJob) {
+                    $job = $savedJob->job;
+                    return [
+                        'id' => $savedJob->id,
+                        'jobId' => $job->id,
+                        'jobTitle' => $job->title,
+                        'company' => $job->company->name ?? 'Unknown Company',
+                        'companyLogo' => $job->company->logo ?? '/api/placeholder/50/50',
+                        'location' => $job->location ? 
+                            $job->location->city . ', ' . $job->location->state : 
+                            'Location not specified',
+                        'salary' => $job->min_salary && $job->max_salary ? 
+                            '$' . number_format($job->min_salary) . ' - $' . number_format($job->max_salary) . '/' . $job->salary_period : 
+                            'Salary not specified',
+                        'jobType' => ucfirst(str_replace('_', ' ', $job->employment_type)),
+                        'experience' => ucfirst($job->experience_level) . ' level',
+                        'skills' => $job->skills->pluck('name')->toArray(),
+                        'description' => $job->description,
+                        'postedDate' => $job->created_at->format('Y-m-d'),
+                        'deadline' => $job->application_deadline ? 
+                            $job->application_deadline->format('Y-m-d') : 
+                            'No deadline',
+                        'savedDate' => $savedJob->saved_at->format('Y-m-d'),
+                        'matchScore' => rand(70, 95), // This would be calculated based on user profile
+                        'isRemote' => $job->remote_work ?? false,
+                        'benefits' => $job->benefits ? json_decode($job->benefits, true) : [],
+                        'requirements' => $job->requirements ? json_decode($job->requirements, true) : []
+                    ];
+                });
+
+            return response()->json([
+                'success' => true,
+                'data' => $savedJobs
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch saved jobs',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Save a job
+     */
+    public function saveJob(Request $request, $jobId)
+    {
+        try {
+            $user = $request->user();
+            
+            // Check if job exists
+            $job = Job::findOrFail($jobId);
+            
+            // Check if already saved
+            $existingSavedJob = SavedJob::where('user_id', $user->id)
+                ->where('job_id', $jobId)
+                ->first();
+                
+            if ($existingSavedJob) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Job already saved'
+                ], 400);
+            }
+
+            // Save the job
+            SavedJob::create([
+                'user_id' => $user->id,
+                'job_id' => $jobId,
+                'saved_at' => now()
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Job saved successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to save job',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Remove a saved job
+     */
+    public function unsaveJob(Request $request, $jobId)
+    {
+        try {
+            $user = $request->user();
+            
+            $savedJob = SavedJob::where('user_id', $user->id)
+                ->where('job_id', $jobId)
+                ->first();
+                
+            if (!$savedJob) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Saved job not found'
+                ], 404);
+            }
+
+            $savedJob->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Job removed from saved jobs'
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to remove saved job',
                 'error' => $e->getMessage()
             ], 500);
         }
