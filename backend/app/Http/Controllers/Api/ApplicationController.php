@@ -264,9 +264,14 @@ class ApplicationController extends Controller
             $application = JobApplication::findOrFail($id);
             
             $validated = $request->validate([
-                'status' => 'sometimes|in:pending,approved,rejected,hired,interview_scheduled',
+                'status' => 'sometimes|in:pending,approved,rejected,hired,interview_scheduled,interview scheduled',
                 'notes' => 'sometimes|string|max:1000'
             ]);
+
+            // Normalize status value
+            if (isset($validated['status'])) {
+                $validated['status'] = str_replace(' ', '_', strtolower($validated['status']));
+            }
 
             $application->update($validated);
 
@@ -465,10 +470,15 @@ class ApplicationController extends Controller
             $application = JobApplication::whereIn('job_id', $employerJobIds)->findOrFail($id);
             
             $validated = $request->validate([
-                'status' => 'sometimes|in:pending,reviewed,shortlisted,interviewed,offered,rejected,withdrawn',
+                'status' => 'sometimes|in:pending,reviewed,shortlisted,interviewed,offered,rejected,withdrawn,interview_scheduled,interview scheduled,hired',
                 'employer_notes' => 'sometimes|string|max:1000',
                 'rating' => 'sometimes|numeric|min:1|max:5'
             ]);
+
+            // Normalize status value
+            if (isset($validated['status'])) {
+                $validated['status'] = str_replace(' ', '_', strtolower($validated['status']));
+            }
 
             $application->update($validated);
 

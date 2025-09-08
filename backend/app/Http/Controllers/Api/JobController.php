@@ -602,4 +602,35 @@ class JobController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Get jobs owned by the authenticated user
+     */
+    public function myJobs(Request $request): JsonResponse
+    {
+        try {
+            $user = $request->user();
+            
+            $jobs = Job::with(['company', 'category', 'location', 'skills'])
+                ->where('user_id', $user->id)
+                ->orderBy('created_at', 'desc')
+                ->paginate(10);
+            
+            return response()->json([
+                'success' => true,
+                'data' => JobResource::collection($jobs),
+                'pagination' => [
+                    'current_page' => $jobs->currentPage(),
+                    'last_page' => $jobs->lastPage(),
+                    'per_page' => $jobs->perPage(),
+                    'total' => $jobs->total(),
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch user jobs: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }

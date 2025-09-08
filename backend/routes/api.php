@@ -124,8 +124,8 @@ Route::prefix('jobs')->group(function () {
     Route::get('/premium', [JobController::class, 'premium']);
     Route::get('/recommended', [JobController::class, 'recommended']);
     Route::get('/stats', [JobController::class, 'stats']);
-    Route::get('/{job}', [JobController::class, 'show']);
     Route::get('/company/{companyId}', [JobController::class, 'byCompany']);
+    Route::get('/{job}', [JobController::class, 'show']);
 });
 
 // Public company routes
@@ -178,8 +178,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/save-job/{job}', [UserController::class, 'unsaveJob']);
     });
 
+    // My jobs route (separate from jobs prefix to avoid conflicts)
+    Route::get('/my-jobs', [JobController::class, 'myJobs']);
+
     // Job management routes (employers only)
     Route::prefix('jobs')->group(function () {
+        Route::get('/my-jobs', [JobController::class, 'myJobs']);
         Route::post('/', [JobController::class, 'store']);
         Route::put('/{job}', [JobController::class, 'update']);
         Route::delete('/{job}', [JobController::class, 'destroy']);

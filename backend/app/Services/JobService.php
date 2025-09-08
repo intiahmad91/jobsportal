@@ -90,9 +90,27 @@ class JobService
     public function updateJob(Job $job, array $data): Job
     {
         return DB::transaction(function () use ($job, $data) {
-            $job->update(array_filter($data, function($value) {
+            // Handle location - if location string is provided, find or create location
+            if (isset($data['location']) && !empty($data['location'])) {
+                $location = \App\Models\JobLocation::firstOrCreate(
+                    ['city' => $data['location']],
+                    [
+                        'state' => '', 
+                        'country' => 'USA', 
+                        'status' => 'active',
+                        'slug' => \Illuminate\Support\Str::slug($data['location'])
+                    ]
+                );
+                $data['location_id'] = $location->id;
+                unset($data['location']); // Remove the location string since we now have location_id
+            }
+
+            // Filter out null values and update the job
+            $updateData = array_filter($data, function($value) {
                 return $value !== null;
-            }));
+            });
+
+            $job->update($updateData);
 
             // Update skills if provided
             if (isset($data['skills']) && is_array($data['skills'])) {
