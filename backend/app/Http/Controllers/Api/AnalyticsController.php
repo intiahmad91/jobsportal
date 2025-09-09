@@ -195,17 +195,41 @@ class AnalyticsController extends Controller
 
     private function getTopSkills($companyId, $startDate)
     {
-        // For now, return mock data since we don't have skills tracking
-        return [
-            ['skill' => 'JavaScript', 'count' => 15, 'percentage' => 18.4],
-            ['skill' => 'React', 'count' => 12, 'percentage' => 15.5],
-            ['skill' => 'Python', 'count' => 10, 'percentage' => 13.1],
-            ['skill' => 'Node.js', 'count' => 8, 'percentage' => 11.4],
-            ['skill' => 'AWS', 'count' => 7, 'percentage' => 10.2],
-            ['skill' => 'TypeScript', 'count' => 6, 'percentage' => 9.0],
-            ['skill' => 'Docker', 'count' => 5, 'percentage' => 7.3],
-            ['skill' => 'SQL', 'count' => 4, 'percentage' => 6.1]
-        ];
+        // Aggregate skills from company's job tags (JSON array on jobs.tags)
+        $tags = Job::where('company_id', $companyId)
+            ->where('created_at', '>=', $startDate)
+            ->whereNotNull('tags')
+            ->pluck('tags')
+            ->filter()
+            ->flatMap(function ($tagsJson) {
+                try {
+                    $decoded = is_array($tagsJson) ? $tagsJson : json_decode($tagsJson, true);
+                    if (!is_array($decoded)) {
+                        return [];
+                    }
+                    // normalize: trim, lowercase
+                    return array_map(function ($t) {
+                        return strtolower(trim((string)$t));
+                    }, $decoded);
+                } catch (\Throwable $e) {
+                    return [];
+                }
+            })
+            ->filter(function ($t) { return $t !== ''; })
+            ->countBy()
+            ->sortDesc();
+
+        $top = $tags->take(10);
+        $total = $top->sum();
+
+        return $top->map(function ($count, $skill) use ($total) {
+            $percentage = $total > 0 ? round(($count / $total) * 100, 1) : 0;
+            return [
+                'skill' => $skill,
+                'count' => $count,
+                'percentage' => $percentage
+            ];
+        })->values();
     }
 
     private function getLocationStats($companyId, $startDate)
@@ -236,14 +260,28 @@ class AnalyticsController extends Controller
 
     private function getSourceStats($companyId, $startDate)
     {
-        // For now, return mock data since we don't have source tracking
-        return [
-            ['source' => 'Direct Application', 'applications' => 45, 'percentage' => 40.0],
-            ['source' => 'LinkedIn', 'applications' => 30, 'percentage' => 26.7],
-            ['source' => 'Indeed', 'applications' => 20, 'percentage' => 17.8],
-            ['source' => 'Glassdoor', 'applications' => 12, 'percentage' => 10.7],
-            ['source' => 'Referral', 'applications' => 5, 'percentage' => 4.5]
-        ];
+        // Derive traffic/application sources from job views referer
+        // Falls back to 'Direct/Unknown' when referer is null
+        $sources = \App\Models\JobView::whereHas('job', function ($q) use ($companyId) {
+                $q->where('company_id', $companyId);
+            })
+            ->where('viewed_at', '>=', $startDate)
+            ->select('referer', DB::raw('COUNT(*) as count'))
+            ->groupBy('referer')
+            ->orderBy('count', 'desc')
+            ->get();
+
+        $total = $sources->sum('count');
+
+        return $sources->map(function ($row) use ($total) {
+            $label = $row->referer ?: 'Direct/Unknown';
+            $percentage = $total > 0 ? round(($row->count / $total) * 100, 1) : 0;
+            return [
+                'source' => $label,
+                'applications' => $row->count,
+                'percentage' => $percentage
+            ];
+        });
     }
 
     private function getTimeToHire($companyId, $startDate)
@@ -267,13 +305,60 @@ class AnalyticsController extends Controller
 
     private function getCandidateQuality($companyId, $startDate)
     {
-        // For now, return mock data since we don't have rating system
-        return [
-            ['rating' => 'Excellent (4.5-5.0)', 'count' => 15, 'percentage' => 18.4],
-            ['rating' => 'Good (4.0-4.4)', 'count' => 25, 'percentage' => 31.8],
-            ['rating' => 'Average (3.5-3.9)', 'count' => 30, 'percentage' => 36.3],
-            ['rating' => 'Below Average (3.0-3.4)', 'count' => 8, 'percentage' => 11.4],
-            ['rating' => 'Poor (Below 3.0)', 'count' => 2, 'percentage' => 2.0]
+        // Get candidate quality based on experience level and application status
+        $quality = JobApplication::whereHas('job', function($query) use ($companyId) {
+            $query->where('company_id', $companyId);
+        })
+        ->where('job_applications.created_at', '>=', $startDate)
+        ->join('users', 'job_applications.user_id', '=', 'users.id')
+        ->join('user_profiles', 'users.id', '=', 'user_profiles.user_id')
+        ->select(
+            'user_profiles.experience_level',
+            'job_applications.status',
+            DB::raw('COUNT(*) as count')
+        )
+        ->groupBy('user_profiles.experience_level', 'job_applications.status')
+        ->get();
+
+        $total = $quality->sum('count');
+        
+        // Categorize by experience level and status
+        $categories = [
+            'Excellent' => 0,
+            'Good' => 0,
+            'Average' => 0,
+            'Below Average' => 0,
+            'Poor' => 0
         ];
+
+        foreach ($quality as $item) {
+            $experience = $item->experience_level ?? 'entry';
+            $status = $item->status;
+            $count = $item->count;
+
+            // Categorize based on experience level and application status
+            if (in_array($experience, ['senior', 'lead', 'principal']) && in_array($status, ['hired', 'approved'])) {
+                $categories['Excellent'] += $count;
+            } elseif (in_array($experience, ['mid', 'senior']) && in_array($status, ['hired', 'approved', 'shortlisted'])) {
+                $categories['Good'] += $count;
+            } elseif (in_array($experience, ['entry', 'mid']) && in_array($status, ['pending', 'shortlisted', 'approved'])) {
+                $categories['Average'] += $count;
+            } elseif (in_array($experience, ['entry']) && in_array($status, ['pending', 'rejected'])) {
+                $categories['Below Average'] += $count;
+            } else {
+                $categories['Poor'] += $count;
+            }
+        }
+
+        return collect($categories)->map(function ($count, $rating) use ($total) {
+            $percentage = $total > 0 ? round(($count / $total) * 100, 1) : 0;
+            return [
+                'rating' => $rating,
+                'count' => $count,
+                'percentage' => $percentage
+            ];
+        })->filter(function ($item) {
+            return $item['count'] > 0;
+        })->values();
     }
 }

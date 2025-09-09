@@ -48,7 +48,7 @@ class UserController extends Controller
                 });
             }
 
-            $users = $query->with('profile')->latest()->paginate(15);
+            $users = $query->with(['profile', 'company'])->latest()->paginate(15);
 
             return response()->json([
                 'success' => true,
@@ -178,7 +178,15 @@ class UserController extends Controller
                 'last_name' => 'nullable|string|max:255',
                 'location' => 'nullable|string|max:255',
                 'experience_level' => ['nullable', Rule::in(['entry', 'junior', 'mid', 'senior', 'expert'])],
-                'open_to_work' => 'nullable|boolean'
+                'open_to_work' => 'nullable|boolean',
+                'education' => 'nullable|string|max:500',
+                'expected_salary' => 'nullable|string|max:100',
+                'preferred_location' => 'nullable|string|max:255',
+                'work_type' => 'nullable|string|max:100',
+                'availability' => 'nullable|string|max:255',
+                'skills' => 'nullable|string',
+                'certifications' => 'nullable|string',
+                'languages' => 'nullable|string'
             ]);
 
             // Update user basic info
@@ -198,6 +206,14 @@ class UserController extends Controller
                 'location' => $validated['location'] ?? $user->profile?->location,
                 'experience_level' => $validated['experience_level'] ?? $user->profile?->experience_level,
                 'open_to_work' => $validated['open_to_work'] ?? $user->profile?->open_to_work ?? false,
+                'education' => $validated['education'] ?? $user->profile?->education,
+                'expected_salary' => $validated['expected_salary'] ?? $user->profile?->expected_salary,
+                'preferred_location' => $validated['preferred_location'] ?? $user->profile?->preferred_location,
+                'work_type' => $validated['work_type'] ?? $user->profile?->work_type,
+                'availability' => $validated['availability'] ?? $user->profile?->availability,
+                'skills' => $validated['skills'] ?? $user->profile?->skills,
+                'certifications' => $validated['certifications'] ?? $user->profile?->certifications,
+                'languages' => $validated['languages'] ?? $user->profile?->languages,
             ];
 
             // Remove null values
@@ -654,10 +670,17 @@ class UserController extends Controller
                 'recentUsers' => User::with('profile')->latest()->take(5)->get(),
                 'recentJobs' => Job::with('company')->latest()->take(5)->get(),
                 'recentApplications' => JobApplication::with(['user', 'job'])->latest()->take(5)->get(),
-                'jobCategories' => Job::selectRaw('category, COUNT(*) as count')
-                    ->groupBy('category')
+                'jobCategories' => Job::with('category')
+                    ->selectRaw('category_id, COUNT(*) as count')
+                    ->groupBy('category_id')
                     ->orderBy('count', 'desc')
-                    ->get(),
+                    ->get()
+                    ->map(function ($job) {
+                        return [
+                            'category' => $job->category ? $job->category->name : 'Unknown',
+                            'count' => $job->count
+                        ];
+                    }),
                 'monthlyStats' => [
                     'users' => User::whereMonth('created_at', now()->month)->count(),
                     'jobs' => Job::whereMonth('created_at', now()->month)->count(),
@@ -673,6 +696,352 @@ class UserController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to fetch analytics: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get reports data (Admin only)
+     */
+    public function reports()
+    {
+        try {
+            $reports = [
+                // User Reports
+                'userReports' => [
+                    'totalUsers' => User::count(),
+                    'activeUsers' => User::whereHas('profile', function($query) {
+                        $query->where('status', 'active');
+                    })->count(),
+                    'jobseekers' => User::whereHas('profile', function($query) {
+                        $query->where('user_type', 'jobseeker');
+                    })->count(),
+                    'employers' => User::whereHas('profile', function($query) {
+                        $query->where('user_type', 'employer');
+                    })->count(),
+                    'newUsersThisMonth' => User::whereMonth('created_at', now()->month)->count(),
+                    'newUsersLastMonth' => User::whereMonth('created_at', now()->subMonth()->month)->count(),
+                ],
+
+                // Job Reports
+                'jobReports' => [
+                    'totalJobs' => Job::count(),
+                    'activeJobs' => Job::where('status', 'active')->count(),
+                    'closedJobs' => Job::where('status', 'closed')->count(),
+                    'featuredJobs' => Job::where('is_featured', true)->count(),
+                    'premiumJobs' => Job::where('is_premium', true)->count(),
+                    'newJobsThisMonth' => Job::whereMonth('created_at', now()->month)->count(),
+                    'newJobsLastMonth' => Job::whereMonth('created_at', now()->subMonth()->month)->count(),
+                    'jobsByType' => Job::selectRaw('employment_type, COUNT(*) as count')
+                        ->groupBy('employment_type')
+                        ->get()
+                        ->map(function ($job) {
+                            return [
+                                'type' => ucfirst(str_replace('_', ' ', $job->employment_type)),
+                                'count' => $job->count
+                            ];
+                        }),
+                    'jobsByExperience' => Job::selectRaw('experience_level, COUNT(*) as count')
+                        ->groupBy('experience_level')
+                        ->get()
+                        ->map(function ($job) {
+                            return [
+                                'level' => ucfirst($job->experience_level),
+                                'count' => $job->count
+                            ];
+                        }),
+                ],
+
+                // Application Reports
+                'applicationReports' => [
+                    'totalApplications' => JobApplication::count(),
+                    'pendingApplications' => JobApplication::where('status', 'pending')->count(),
+                    'approvedApplications' => JobApplication::where('status', 'reviewed')->count(),
+                    'rejectedApplications' => JobApplication::where('status', 'rejected')->count(),
+                    'hiredApplications' => JobApplication::where('status', 'hired')->count(),
+                    'interviewScheduled' => JobApplication::where('status', 'interview_scheduled')->count(),
+                    'newApplicationsThisMonth' => JobApplication::whereMonth('created_at', now()->month)->count(),
+                    'newApplicationsLastMonth' => JobApplication::whereMonth('created_at', now()->subMonth()->month)->count(),
+                    'applicationsByStatus' => JobApplication::selectRaw('status, COUNT(*) as count')
+                        ->groupBy('status')
+                        ->get()
+                        ->map(function ($app) {
+                            return [
+                                'status' => ucfirst(str_replace('_', ' ', $app->status)),
+                                'count' => $app->count
+                            ];
+                        }),
+                ],
+
+                // Company Reports
+                'companyReports' => [
+                    'totalCompanies' => Company::count(),
+                    'verifiedCompanies' => Company::where('is_verified', true)->count(),
+                    'unverifiedCompanies' => Company::where('is_verified', false)->count(),
+                    'featuredCompanies' => Company::where('is_featured', true)->count(),
+                    'newCompaniesThisMonth' => Company::whereMonth('created_at', now()->month)->count(),
+                    'newCompaniesLastMonth' => Company::whereMonth('created_at', now()->subMonth()->month)->count(),
+                    'companiesBySize' => Company::selectRaw('company_size, COUNT(*) as count')
+                        ->whereNotNull('company_size')
+                        ->groupBy('company_size')
+                        ->get()
+                        ->map(function ($company) {
+                            return [
+                                'size' => $company->company_size,
+                                'count' => $company->count
+                            ];
+                        }),
+                ],
+
+                // Monthly Trends (Last 6 months)
+                'monthlyTrends' => $this->getMonthlyTrends(),
+
+                // Top Performing Jobs
+                'topPerformingJobs' => Job::with('company')
+                    ->withCount('applications')
+                    ->orderBy('applications_count', 'desc')
+                    ->take(10)
+                    ->get()
+                    ->map(function ($job) {
+                        return [
+                            'id' => $job->id,
+                            'title' => $job->title,
+                            'company' => $job->company ? $job->company->name : 'Unknown',
+                            'applications' => $job->applications_count,
+                            'views' => $job->views_count ?? 0,
+                            'status' => $job->status,
+                        ];
+                    }),
+
+                // Top Companies by Job Count
+                'topCompanies' => Company::withCount('jobs')
+                    ->orderBy('jobs_count', 'desc')
+                    ->take(10)
+                    ->get()
+                    ->map(function ($company) {
+                        return [
+                            'id' => $company->id,
+                            'name' => $company->name,
+                            'jobs' => $company->jobs_count,
+                            'is_verified' => $company->is_verified,
+                            'created_at' => $company->created_at,
+                        ];
+                    }),
+            ];
+
+            return response()->json([
+                'success' => true,
+                'data' => $reports
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch reports: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get monthly trends for the last 6 months
+     */
+    private function getMonthlyTrends()
+    {
+        $trends = [];
+        
+        for ($i = 5; $i >= 0; $i--) {
+            $date = now()->subMonths($i);
+            $monthName = $date->format('M Y');
+            
+            $trends[] = [
+                'month' => $monthName,
+                'users' => User::whereYear('created_at', $date->year)
+                    ->whereMonth('created_at', $date->month)
+                    ->count(),
+                'jobs' => Job::whereYear('created_at', $date->year)
+                    ->whereMonth('created_at', $date->month)
+                    ->count(),
+                'applications' => JobApplication::whereYear('created_at', $date->year)
+                    ->whereMonth('created_at', $date->month)
+                    ->count(),
+                'companies' => Company::whereYear('created_at', $date->year)
+                    ->whereMonth('created_at', $date->month)
+                    ->count(),
+            ];
+        }
+        
+        return $trends;
+    }
+
+    /**
+     * Get admin settings (Admin only)
+     */
+    public function getAdminSettings()
+    {
+        try {
+            $settings = [
+                'general' => [
+                    'siteName' => \App\Models\Setting::get('siteName', 'Jobs Portal'),
+                    'siteDescription' => \App\Models\Setting::get('siteDescription', 'Find your dream job with our comprehensive job portal'),
+                    'siteUrl' => \App\Models\Setting::get('siteUrl', 'http://localhost:3000'),
+                    'adminEmail' => \App\Models\Setting::get('adminEmail', 'admin@jobsportal.com'),
+                    'timezone' => \App\Models\Setting::get('timezone', 'UTC'),
+                    'language' => \App\Models\Setting::get('language', 'en'),
+                    'maintenanceMode' => \App\Models\Setting::get('maintenanceMode', false),
+                ],
+                'email' => [
+                    'smtpHost' => \App\Models\Setting::get('smtpHost', 'smtp.gmail.com'),
+                    'smtpPort' => \App\Models\Setting::get('smtpPort', 587),
+                    'smtpUsername' => \App\Models\Setting::get('smtpUsername', ''),
+                    'smtpPassword' => \App\Models\Setting::get('smtpPassword', ''),
+                    'fromEmail' => \App\Models\Setting::get('fromEmail', 'noreply@jobsportal.com'),
+                    'fromName' => \App\Models\Setting::get('fromName', 'Jobs Portal'),
+                    'emailNotifications' => \App\Models\Setting::get('emailNotifications', true),
+                ],
+                'security' => [
+                    'passwordMinLength' => \App\Models\Setting::get('passwordMinLength', 8),
+                    'requireEmailVerification' => \App\Models\Setting::get('requireEmailVerification', true),
+                    'allowRegistration' => \App\Models\Setting::get('allowRegistration', true),
+                    'sessionTimeout' => \App\Models\Setting::get('sessionTimeout', 30),
+                    'maxLoginAttempts' => \App\Models\Setting::get('maxLoginAttempts', 5),
+                    'twoFactorAuth' => \App\Models\Setting::get('twoFactorAuth', false),
+                ],
+                'system' => [
+                    'maxFileSize' => \App\Models\Setting::get('maxFileSize', 5),
+                    'allowedFileTypes' => \App\Models\Setting::get('allowedFileTypes', ['pdf', 'doc', 'docx']),
+                    'backupFrequency' => \App\Models\Setting::get('backupFrequency', 'daily'),
+                    'logLevel' => \App\Models\Setting::get('logLevel', 'info'),
+                    'cacheEnabled' => \App\Models\Setting::get('cacheEnabled', true),
+                    'debugMode' => \App\Models\Setting::get('debugMode', false),
+                ],
+                'notifications' => [
+                    'newUserNotification' => \App\Models\Setting::get('newUserNotification', true),
+                    'newJobNotification' => \App\Models\Setting::get('newJobNotification', true),
+                    'newApplicationNotification' => \App\Models\Setting::get('newApplicationNotification', true),
+                    'systemAlerts' => \App\Models\Setting::get('systemAlerts', true),
+                    'emailDigest' => \App\Models\Setting::get('emailDigest', false),
+                ],
+            ];
+
+            return response()->json([
+                'success' => true,
+                'data' => $settings
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch settings: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Update admin settings (Admin only)
+     */
+    public function updateAdminSettings(Request $request)
+    {
+        try {
+            $validated = $request->validate([
+                'general' => 'sometimes|array',
+                'general.siteName' => 'sometimes|string|max:255',
+                'general.siteDescription' => 'sometimes|string|max:500',
+                'general.siteUrl' => 'sometimes|url|max:255',
+                'general.adminEmail' => 'sometimes|email|max:255',
+                'general.timezone' => 'sometimes|string|max:50',
+                'general.language' => 'sometimes|string|max:10',
+                'general.maintenanceMode' => 'sometimes|boolean',
+                
+                'email' => 'sometimes|array',
+                'email.smtpHost' => 'sometimes|string|max:255',
+                'email.smtpPort' => 'sometimes|integer|min:1|max:65535',
+                'email.smtpUsername' => 'sometimes|string|max:255',
+                'email.smtpPassword' => 'sometimes|string|max:255',
+                'email.fromEmail' => 'sometimes|email|max:255',
+                'email.fromName' => 'sometimes|string|max:255',
+                'email.emailNotifications' => 'sometimes|boolean',
+                
+                'security' => 'sometimes|array',
+                'security.passwordMinLength' => 'sometimes|integer|min:6|max:50',
+                'security.requireEmailVerification' => 'sometimes|boolean',
+                'security.allowRegistration' => 'sometimes|boolean',
+                'security.sessionTimeout' => 'sometimes|integer|min:15|max:480',
+                'security.maxLoginAttempts' => 'sometimes|integer|min:3|max:20',
+                'security.twoFactorAuth' => 'sometimes|boolean',
+                
+                'system' => 'sometimes|array',
+                'system.maxFileSize' => 'sometimes|integer|min:1|max:100',
+                'system.allowedFileTypes' => 'sometimes|array',
+                'system.backupFrequency' => 'sometimes|string|in:daily,weekly,monthly',
+                'system.logLevel' => 'sometimes|string|in:debug,info,warn,error',
+                'system.cacheEnabled' => 'sometimes|boolean',
+                'system.debugMode' => 'sometimes|boolean',
+                
+                'notifications' => 'sometimes|array',
+                'notifications.newUserNotification' => 'sometimes|boolean',
+                'notifications.newJobNotification' => 'sometimes|boolean',
+                'notifications.newApplicationNotification' => 'sometimes|boolean',
+                'notifications.systemAlerts' => 'sometimes|boolean',
+                'notifications.emailDigest' => 'sometimes|boolean',
+            ]);
+
+            // Update settings in database
+            if (isset($validated['general'])) {
+                foreach ($validated['general'] as $key => $value) {
+                    $settingKey = str_replace('_', '_', $key);
+                    if ($key === 'maintenanceMode') {
+                        \App\Models\Setting::set($settingKey, $value, 'boolean', 'general');
+                    } else {
+                        \App\Models\Setting::set($settingKey, $value, 'string', 'general');
+                    }
+                }
+            }
+
+            if (isset($validated['email'])) {
+                foreach ($validated['email'] as $key => $value) {
+                    $settingKey = str_replace('_', '_', $key);
+                    $type = in_array($key, ['smtpPort']) ? 'integer' : 'string';
+                    if ($key === 'emailNotifications') $type = 'boolean';
+                    \App\Models\Setting::set($settingKey, $value, $type, 'email');
+                }
+            }
+
+            if (isset($validated['security'])) {
+                foreach ($validated['security'] as $key => $value) {
+                    $settingKey = str_replace('_', '_', $key);
+                    $type = in_array($key, ['passwordMinLength', 'sessionTimeout', 'maxLoginAttempts']) ? 'integer' : 'boolean';
+                    \App\Models\Setting::set($settingKey, $value, $type, 'security');
+                }
+            }
+
+            if (isset($validated['system'])) {
+                foreach ($validated['system'] as $key => $value) {
+                    $settingKey = str_replace('_', '_', $key);
+                    if ($key === 'allowedFileTypes') {
+                        \App\Models\Setting::set($settingKey, $value, 'json', 'system');
+                    } elseif (in_array($key, ['maxFileSize'])) {
+                        \App\Models\Setting::set($settingKey, $value, 'integer', 'system');
+                    } elseif (in_array($key, ['cacheEnabled', 'debugMode'])) {
+                        \App\Models\Setting::set($settingKey, $value, 'boolean', 'system');
+                    } else {
+                        \App\Models\Setting::set($settingKey, $value, 'string', 'system');
+                    }
+                }
+            }
+
+            if (isset($validated['notifications'])) {
+                foreach ($validated['notifications'] as $key => $value) {
+                    $settingKey = str_replace('_', '_', $key);
+                    \App\Models\Setting::set($settingKey, $value, 'boolean', 'notifications');
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Settings updated successfully'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update settings: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -971,6 +1340,7 @@ class UserController extends Controller
                 ->get()
                 ->map(function($job) {
                     $applicationsCount = JobApplication::where('job_id', $job->id)->count();
+                    $viewsCount = JobView::where('job_id', $job->id)->count();
                     return [
                         'id' => $job->id,
                         'title' => $job->title,
@@ -980,7 +1350,7 @@ class UserController extends Controller
                         'status' => ucfirst($job->status),
                         'postedAt' => $job->created_at->diffForHumans(),
                         'applications' => $applicationsCount,
-                        'views' => rand(50, 500) // Mock views for now
+                        'views' => $viewsCount // Real view count from database
                     ];
                 });
 
@@ -1026,29 +1396,30 @@ class UserController extends Controller
             ->take(5)
             ->values();
 
-            // Get mock view counts (job_views table doesn't exist yet)
-            $monthlyViews = rand(100, 1000);
-            $profileViews = rand(20, 200);
+            // Get real view counts from JobView table
+            $monthlyViews = JobView::whereHas('job', function($query) use ($company) {
+                $query->where('company_id', $company->id);
+            })->where('viewed_at', '>=', now()->subMonth())->count();
+            
+            $profileViews = JobView::whereHas('job', function($query) use ($company) {
+                $query->where('company_id', $company->id);
+            })->count();
 
-            // Get mock activity logs (ActivityLog table might not exist)
-            $recentActivity = collect([
-                [
-                    'id' => 1,
-                    'type' => 'job_posted',
-                    'description' => 'New job posted: Software Developer',
-                    'timestamp' => '2 hours ago',
-                    'user' => 'Admin',
-                    'icon' => 'fas fa-plus'
-                ],
-                [
-                    'id' => 2,
-                    'type' => 'application_received',
-                    'description' => 'New application received for Marketing Manager',
-                    'timestamp' => '4 hours ago',
-                    'user' => 'System',
-                    'icon' => 'fas fa-user-plus'
-                ]
-            ]);
+            // Get real activity logs from ActivityLog table
+            $recentActivity = ActivityLog::where('company_id', $company->id)
+                ->latest('activity_at')
+                ->limit(5)
+                ->get()
+                ->map(function($activity) {
+                    return [
+                        'id' => $activity->id,
+                        'type' => $activity->type,
+                        'description' => $activity->description,
+                        'timestamp' => $activity->activity_at->diffForHumans(),
+                        'user' => $activity->user_name ?? 'System',
+                        'icon' => $activity->icon ?? 'fas fa-info'
+                    ];
+                });
 
             return response()->json([
                 'success' => true,

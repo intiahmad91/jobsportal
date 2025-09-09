@@ -66,6 +66,26 @@ class CompanyController extends Controller
     }
 
     /**
+     * Public: Show a company by ID (no auth required).
+     */
+    public function publicShow(Company $company): JsonResponse
+    {
+        try {
+            $company->load(['user']);
+
+            return response()->json([
+                'success' => true,
+                'data' => $company
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
      * Store a newly created company.
      */
     public function adminStore(Request $request): JsonResponse
@@ -89,7 +109,8 @@ class CompanyController extends Controller
                 'vision' => 'nullable|string',
                 'benefits' => 'nullable|string',
                 'social_links' => 'nullable|string',
-                'status' => 'required|in:active,inactive,pending',
+                // Must match DB enum in companies table: active, inactive, suspended
+                'status' => 'required|in:active,inactive,suspended',
                 'user_id' => 'required|exists:users,id'
             ]);
 
@@ -116,7 +137,7 @@ class CompanyController extends Controller
     {
         try {
             $validated = $request->validate([
-                'name' => 'required|string|max:255',
+                'name' => 'sometimes|required|string|max:255',
                 'description' => 'nullable|string',
                 'website' => 'nullable|url',
                 'email' => 'nullable|email',
@@ -133,7 +154,8 @@ class CompanyController extends Controller
                 'vision' => 'nullable|string',
                 'benefits' => 'nullable|string',
                 'social_links' => 'nullable|string',
-                'status' => 'required|in:active,inactive,pending'
+                // Must match DB enum in companies table: active, inactive, suspended
+                'status' => 'sometimes|required|in:active,inactive,suspended'
             ]);
 
             $company->update($validated);

@@ -131,7 +131,8 @@ Route::prefix('jobs')->group(function () {
 // Public company routes
 Route::prefix('companies')->group(function () {
     Route::get('/', [CompanyController::class, 'index']);
-    Route::get('/{company}', [CompanyController::class, 'show']);
+    // Use a dedicated publicShow that resolves {company} and loads relations
+    Route::get('/{company}', [CompanyController::class, 'publicShow']);
 });
 
 // Public job seeker routes
@@ -284,6 +285,9 @@ Route::middleware('auth:sanctum')->group(function () {
         
         Route::get('/statistics', [UserController::class, 'statistics']);
         Route::get('/analytics', [UserController::class, 'analytics']);
+        Route::get('/reports', [UserController::class, 'reports']);
+        Route::get('/settings', [UserController::class, 'getAdminSettings']);
+        Route::put('/settings', [UserController::class, 'updateAdminSettings']);
         Route::get('/export-data', [UserController::class, 'exportData']);
     });
 });
