@@ -25,6 +25,7 @@ class JobSeekerController extends Controller
                       });
                 });
 
+
             // Apply filters
             if ($request->has('experience_levels') && !empty($request->experience_levels)) {
                 $experienceLevels = is_array($request->experience_levels) ? $request->experience_levels : explode(',', $request->experience_levels);
@@ -259,6 +260,118 @@ class JobSeekerController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Error retrieving featured job seekers',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Log candidate contact interaction.
+     */
+    public function logContact(Request $request): JsonResponse
+    {
+        try {
+            $request->validate([
+                'candidate_id' => 'required|integer|exists:users,id',
+                'job_id' => 'nullable|integer|exists:jobs,id',
+                'message' => 'nullable|string|max:1000'
+            ]);
+
+            $interaction = \App\Models\CandidateInteraction::create([
+                'employer_id' => auth()->id(),
+                'candidate_id' => $request->candidate_id,
+                'job_id' => $request->job_id,
+                'interaction_type' => 'contact',
+                'message' => $request->message,
+                'status' => 'initiated'
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Contact interaction logged successfully',
+                'data' => $interaction
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error logging contact interaction',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Log candidate resume view interaction.
+     */
+    public function logViewResume(Request $request): JsonResponse
+    {
+        try {
+            $request->validate([
+                'candidate_id' => 'required|integer|exists:users,id',
+                'job_id' => 'nullable|integer|exists:jobs,id'
+            ]);
+
+            $interaction = \App\Models\CandidateInteraction::create([
+                'employer_id' => auth()->id(),
+                'candidate_id' => $request->candidate_id,
+                'job_id' => $request->job_id,
+                'interaction_type' => 'view_resume',
+                'status' => 'completed'
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Resume view interaction logged successfully',
+                'data' => $interaction
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error logging resume view interaction',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Log candidate hire interaction.
+     */
+    public function logHire(Request $request): JsonResponse
+    {
+        try {
+            $request->validate([
+                'candidate_id' => 'required|integer|exists:users,id',
+                'job_id' => 'required|integer|exists:jobs,id',
+                'message' => 'nullable|string|max:1000',
+                'salary_offered' => 'nullable|numeric',
+                'start_date' => 'nullable|date'
+            ]);
+
+            $interaction = \App\Models\CandidateInteraction::create([
+                'employer_id' => auth()->id(),
+                'candidate_id' => $request->candidate_id,
+                'job_id' => $request->job_id,
+                'interaction_type' => 'hire',
+                'message' => $request->message,
+                'status' => 'pending',
+                'metadata' => json_encode([
+                    'salary_offered' => $request->salary_offered,
+                    'start_date' => $request->start_date
+                ])
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Hire interaction logged successfully',
+                'data' => $interaction
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error logging hire interaction',
                 'error' => $e->getMessage()
             ], 500);
         }

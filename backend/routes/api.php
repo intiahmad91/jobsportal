@@ -141,6 +141,15 @@ Route::prefix('job-seekers')->group(function () {
     Route::get('/{id}', [JobSeekerController::class, 'show']);
 });
 
+// Candidate interaction routes (authenticated)
+Route::middleware('auth:sanctum')->group(function () {
+    Route::prefix('candidate-interactions')->group(function () {
+        Route::post('/contact', [JobSeekerController::class, 'logContact']);
+        Route::post('/view-resume', [JobSeekerController::class, 'logViewResume']);
+        Route::post('/hire', [JobSeekerController::class, 'logHire']);
+    });
+});
+
 // Public categories routes
 Route::get('/categories', function () {
     return response()->json([

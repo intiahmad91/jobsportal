@@ -20,13 +20,14 @@ class JobService
             // Handle location - if location string is provided, find or create location
             $locationId = 1; // Default location ID
             if (isset($data['location']) && !empty($data['location'])) {
+                $slug = \Illuminate\Support\Str::slug($data['location']);
                 $location = \App\Models\JobLocation::firstOrCreate(
-                    ['city' => $data['location']],
+                    ['slug' => $slug],
                     [
+                        'city' => $data['location'],
                         'state' => '', 
                         'country' => 'USA', 
-                        'status' => 'active',
-                        'slug' => \Illuminate\Support\Str::slug($data['location'])
+                        'status' => 'active'
                     ]
                 );
                 $locationId = $location->id;
@@ -92,13 +93,14 @@ class JobService
         return DB::transaction(function () use ($job, $data) {
             // Handle location - if location string is provided, find or create location
             if (isset($data['location']) && !empty($data['location'])) {
+                $slug = \Illuminate\Support\Str::slug($data['location']);
                 $location = \App\Models\JobLocation::firstOrCreate(
-                    ['city' => $data['location']],
+                    ['slug' => $slug],
                     [
+                        'city' => $data['location'],
                         'state' => '', 
                         'country' => 'USA', 
-                        'status' => 'active',
-                        'slug' => \Illuminate\Support\Str::slug($data['location'])
+                        'status' => 'active'
                     ]
                 );
                 $data['location_id'] = $location->id;
