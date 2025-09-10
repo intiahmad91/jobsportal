@@ -13,3 +13,4 @@ if (!$user) {
 
 $token = $user->createToken('dev')->plainTextToken;
 echo $token . "\n";
+
