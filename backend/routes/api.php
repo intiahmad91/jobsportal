@@ -285,6 +285,42 @@ Route::middleware('auth:sanctum')->group(function () {
         
         Route::get('/statistics', [UserController::class, 'statistics']);
         Route::get('/analytics', [UserController::class, 'analytics']);
+        Route::get('/analytics-test', function() {
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'totalUsers' => 1250,
+                    'activeJobs' => 380,
+                    'totalApplications' => 2150,
+                    'totalCompanies' => 120,
+                    'verifiedCompanies' => 95,
+                    'featuredJobs' => 25,
+                    'premiumJobs' => 15,
+                    'recentUsers' => [
+                        ['id' => 1, 'name' => 'John Doe', 'email' => 'john@example.com', 'createdAt' => now()->toISOString()],
+                        ['id' => 2, 'name' => 'Jane Smith', 'email' => 'jane@example.com', 'createdAt' => now()->subDays(1)->toISOString()]
+                    ],
+                    'recentJobs' => [
+                        ['id' => 1, 'title' => 'Senior Developer', 'company' => 'Tech Corp', 'createdAt' => now()->toISOString()],
+                        ['id' => 2, 'title' => 'Marketing Manager', 'company' => 'Marketing Inc', 'createdAt' => now()->subDays(1)->toISOString()]
+                    ],
+                    'recentApplications' => [
+                        ['id' => 1, 'jobTitle' => 'Senior Developer', 'candidateName' => 'John Doe', 'appliedAt' => now()->toISOString()],
+                        ['id' => 2, 'jobTitle' => 'Marketing Manager', 'candidateName' => 'Jane Smith', 'appliedAt' => now()->subDays(1)->toISOString()]
+                    ],
+                    'jobCategories' => [
+                        ['id' => 1, 'name' => 'Technology', 'count' => 150],
+                        ['id' => 2, 'name' => 'Marketing', 'count' => 85],
+                        ['id' => 3, 'name' => 'Sales', 'count' => 70]
+                    ],
+                    'monthlyStats' => [
+                        'users' => 125,
+                        'jobs' => 45,
+                        'applications' => 320
+                    ]
+                ]
+            ]);
+        });
         Route::get('/reports', [UserController::class, 'reports']);
         Route::get('/settings', [UserController::class, 'getAdminSettings']);
         Route::put('/settings', [UserController::class, 'updateAdminSettings']);
