@@ -702,9 +702,9 @@ class UserController extends Controller
             // Get job categories safely using JobCategory model
             $jobCategories = \App\Models\JobCategory::withCount('jobs')
                 ->orderBy('jobs_count', 'desc')
-                ->get()
+                    ->get()
                 ->map(function ($category) {
-                    return [
+                        return [
                         'id' => $category->id,
                         'name' => $category->name,
                         'count' => $category->jobs_count
@@ -713,9 +713,9 @@ class UserController extends Controller
             
             // Get monthly stats
             $monthlyStats = [
-                'users' => User::whereMonth('created_at', now()->month)->count(),
-                'jobs' => Job::whereMonth('created_at', now()->month)->count(),
-                'applications' => JobApplication::whereMonth('created_at', now()->month)->count(),
+                    'users' => User::whereMonth('created_at', now()->month)->count(),
+                    'jobs' => Job::whereMonth('created_at', now()->month)->count(),
+                    'applications' => JobApplication::whereMonth('created_at', now()->month)->count(),
             ];
 
             $analytics = [
