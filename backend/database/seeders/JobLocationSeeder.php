@@ -26,6 +26,7 @@ class JobLocationSeeder extends Seeder
             ['city' => 'San Diego', 'state' => 'CA', 'country' => 'United States', 'latitude' => 32.7157, 'longitude' => -117.1611],
             ['city' => 'Dallas', 'state' => 'TX', 'country' => 'United States', 'latitude' => 32.7767, 'longitude' => -96.7970],
             ['city' => 'San Jose', 'state' => 'CA', 'country' => 'United States', 'latitude' => 37.3382, 'longitude' => -121.8863],
+            ['city' => 'California', 'state' => 'CA', 'country' => 'United States', 'latitude' => 36.7783, 'longitude' => -119.4179],
             
             // Canada
             ['city' => 'Toronto', 'state' => 'ON', 'country' => 'Canada', 'latitude' => 43.6532, 'longitude' => -79.3832],

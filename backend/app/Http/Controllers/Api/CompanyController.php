@@ -66,6 +66,55 @@ class CompanyController extends Controller
     }
 
     /**
+     * Public: List all companies (no auth required).
+     */
+    public function index(Request $request): JsonResponse
+    {
+        try {
+            $query = Company::with(['user']);
+            
+            // Search functionality
+            if ($request->has('search')) {
+                $search = $request->search;
+                $query->where(function($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                      ->orWhere('description', 'like', "%{$search}%")
+                      ->orWhere('industry', 'like', "%{$search}%");
+                });
+            }
+
+            // Filter by industry
+            if ($request->has('industry') && $request->industry !== 'all') {
+                $query->where('industry', $request->industry);
+            }
+
+            // Filter by company size
+            if ($request->has('size') && $request->size !== 'all') {
+                $query->where('company_size', $request->size);
+            }
+
+            $limit = $request->get('limit', 15);
+            $companies = $query->latest()->paginate($limit);
+
+            return response()->json([
+                'success' => true,
+                'data' => $companies->items(),
+                'pagination' => [
+                    'current_page' => $companies->currentPage(),
+                    'last_page' => $companies->lastPage(),
+                    'per_page' => $companies->perPage(),
+                    'total' => $companies->total(),
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
      * Public: Show a company by ID (no auth required).
      */
     public function publicShow(Company $company): JsonResponse

@@ -32,6 +32,8 @@ class UserProfile extends Model
         'linkedin',
         'github',
         'portfolio',
+        'title',
+        'education',
         'experience_level',
         'current_salary',
         'expected_salary',

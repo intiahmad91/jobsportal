@@ -50,14 +50,9 @@ export default function JobsPage() {
             <nav>
               <a href="/" className="nav-link">Home</a>
               <a href="/jobs" className="nav-link">Jobseeker</a>
-              <a href="/jobseeker-login" className="nav-link">Jobseeker Login</a>
-              <a href="/jobseeker-registration" className="nav-link">Jobseeker Registration</a>
               <a href="/jobs" className="nav-link">Jobs</a>
               <a href="/job-single" className="nav-link">Job Single</a>
               <a href="/post-job" className="nav-link">Post Job</a>
-              <a href="/employer-login" className="nav-link">Employer Login</a>
-              <a href="/employee-registration" className="nav-link">Employee Registration</a>
-              <a href="/candidate-registration" className="nav-link">Candidate Registration</a>
               <a href="/candidates" className="nav-link">Candidate Listing</a>
               <a href="/candidate-details" className="nav-link">Candidate Details</a>
               <a href="#." className="nav-link">Admin</a>

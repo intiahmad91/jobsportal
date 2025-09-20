@@ -23,6 +23,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'role',
     ];
 
     /**
@@ -132,7 +133,7 @@ class User extends Authenticatable
      */
     public function isEmployer(): bool
     {
-        return $this->profile && $this->profile->user_type === 'employer';
+        return $this->role === 'employer';
     }
 
     /**
@@ -140,7 +141,7 @@ class User extends Authenticatable
      */
     public function isJobseeker(): bool
     {
-        return $this->profile && $this->profile->user_type === 'jobseeker';
+        return $this->role === 'jobseeker';
     }
 
     /**
@@ -148,7 +149,7 @@ class User extends Authenticatable
      */
     public function isAdmin(): bool
     {
-        return $this->profile && $this->profile->user_type === 'admin';
+        return $this->role === 'admin';
     }
 
     /**

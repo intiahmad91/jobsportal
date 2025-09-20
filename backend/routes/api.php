@@ -39,6 +39,42 @@ Route::get('/test', function () {
     ]);
 });
 
+// Debug route to check user and company data
+Route::get('/debug/user-company', function (Request $request) {
+    try {
+        $user = $request->user();
+        
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No authenticated user'
+            ], 401);
+        }
+        
+        $user->load(['profile', 'company']);
+        
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'profile' => $user->profile,
+                    'company' => $user->company,
+                    'has_company' => $user->company ? true : false
+                ]
+            ]
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ], 500);
+    }
+});
+
 
 // Admin dashboard route (temporarily without auth for testing)
 Route::get('/admin/dashboard', [App\Http\Controllers\Api\AdminController::class, 'dashboard']);
@@ -173,8 +209,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // User routes
     Route::prefix('user')->group(function () {
-        Route::get('/profile', [UserController::class, 'getProfile']);
-        Route::put('/profile', [UserController::class, 'updateProfile']);
+    Route::get('/profile', [UserController::class, 'getProfile']);
+    Route::put('/profile', [UserController::class, 'updateProfile']);
+    Route::get('/skills', [UserController::class, 'getSkills']);
         Route::post('/avatar', [UserController::class, 'uploadAvatar']);
         Route::post('/cv', [UserController::class, 'uploadCV']);
         Route::get('/cv', [UserController::class, 'getCV']);

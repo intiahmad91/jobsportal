@@ -12,6 +12,7 @@ use App\Models\JobApplication;
 use App\Models\JobView;
 use App\Models\ActivityLog;
 use App\Models\SavedJob;
+use App\Models\Skill;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 
@@ -285,26 +286,65 @@ class UserController extends Controller
     }
 
     /**
-     * Get user profile (Authenticated user)
+     * Get user profile (Authenticated user) - Simple and Clean
      */
     public function getProfile(Request $request)
     {
         try {
             $user = $request->user();
-            $profile = $user->profile;
             
+            // Get or create profile
+            $profile = $user->profile;
             if (!$profile) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Profile not found'
-                ], 404);
+                $profile = $user->profile()->create([
+                    'user_type' => 'jobseeker',
+                    'status' => 'active'
+                ]);
             }
-
+            
+            // Load skills as simple array of names
+            $skills = $profile->skills()->pluck('name')->toArray();
+            
+            // Simple profile data structure
+            $profileData = [
+                'id' => $profile->id,
+                'user_id' => $profile->user_id,
+                'first_name' => $profile->first_name,
+                'last_name' => $profile->last_name,
+                'phone' => $profile->phone,
+                'bio' => $profile->bio,
+                'location' => $profile->location,
+                'title' => $profile->title,
+                'education' => $profile->education,
+                'experience_level' => $profile->experience_level,
+                'current_salary' => $profile->current_salary,
+                'expected_salary' => $profile->expected_salary,
+                'employment_status' => $profile->employment_status,
+                'open_to_work' => $profile->open_to_work,
+                'open_to_relocation' => $profile->open_to_relocation,
+                'open_to_remote' => $profile->open_to_remote,
+                'website' => $profile->website,
+                'linkedin' => $profile->linkedin,
+                'github' => $profile->github,
+                'portfolio' => $profile->portfolio,
+                'skills' => $skills,
+                'created_at' => $profile->created_at,
+                'updated_at' => $profile->updated_at
+            ];
+            
+            // Simple user data
+            $userData = [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'role' => $user->role
+            ];
+            
             return response()->json([
                 'success' => true,
                 'data' => [
-                    'user' => $user,
-                    'profile' => $profile->load('skills')
+                    'user' => $userData,
+                    'profile' => $profileData
                 ]
             ]);
         } catch (\Exception $e) {
@@ -316,55 +356,48 @@ class UserController extends Controller
     }
 
     /**
-     * Update user profile (Authenticated user)
+     * Update user profile (Authenticated user) - Simple and Clean
      */
     public function updateProfile(Request $request)
     {
         try {
             $user = $request->user();
             
-            // Validate user basic fields
-            $userValidated = $request->validate([
-                'name' => 'sometimes|string|max:255',
-                'email' => 'sometimes|email|max:255|unique:users,email,' . $user->id,
-            ]);
-
-            // Validate profile fields
-            $profileValidated = $request->validate([
+            // Simple validation for all fields
+            $validated = $request->validate([
+                // User fields
+                'name' => 'nullable|string|max:255',
+                'email' => 'nullable|email|max:255|unique:users,email,' . $user->id,
+                
+                // Profile fields
+                'first_name' => 'nullable|string|max:255',
+                'last_name' => 'nullable|string|max:255',
                 'phone' => 'nullable|string|max:20',
                 'bio' => 'nullable|string|max:1000',
                 'location' => 'nullable|string|max:255',
-                'linkedin' => 'nullable|url|max:255',
-                'github' => 'nullable|url|max:255',
-                'portfolio' => 'nullable|url|max:255',
-                'twitter' => 'nullable|url|max:255',
-                'experience_level' => 'nullable|string|in:entry,mid,senior,executive',
-                'expected_salary' => 'nullable|numeric|min:0',
-                'open_to_work' => 'nullable|boolean',
-                'open_to_remote' => 'nullable|boolean',
-                'date_of_birth' => 'nullable|date',
-                'gender' => 'nullable|string|in:male,female,other',
-                'nationality' => 'nullable|string|max:100',
                 'title' => 'nullable|string|max:255',
-                'summary' => 'nullable|string|max:1000',
                 'education' => 'nullable|string|max:255',
-                'skills' => 'nullable|array',
-                'languages' => 'nullable|array',
-                'availability' => 'nullable|string|max:255',
-                'work_type' => 'nullable|array',
-                'job_types' => 'nullable|array',
-                'locations' => 'nullable|array',
-                'industries' => 'nullable|array',
-                'company_size' => 'nullable|string|max:100',
-                'notifications' => 'nullable|boolean'
+                'experience_level' => 'nullable|string|in:entry,mid,senior,executive',
+                'current_salary' => 'nullable|string|max:50',
+                'expected_salary' => 'nullable|string|max:50',
+                'employment_status' => 'nullable|string|in:employed,unemployed,freelancer,student',
+                'open_to_work' => 'nullable|boolean',
+                'open_to_relocation' => 'nullable|boolean',
+                'open_to_remote' => 'nullable|boolean',
+                'website' => 'nullable|string|max:255',
+                'linkedin' => 'nullable|string|max:255',
+                'github' => 'nullable|string|max:255',
+                'portfolio' => 'nullable|string|max:255',
+                'skills' => 'nullable|array'
             ]);
 
-            // Update user basic fields
-            if (!empty($userValidated)) {
-                $user->update($userValidated);
+            // Update user fields
+            $userFields = array_intersect_key($validated, array_flip(['name', 'email']));
+            if (!empty($userFields)) {
+                $user->update($userFields);
             }
 
-            // Update or create profile
+            // Get or create profile
             $profile = $user->profile;
             if (!$profile) {
                 $profile = $user->profile()->create([
@@ -374,12 +407,15 @@ class UserController extends Controller
             }
 
             // Update profile fields
-            $profile->update($profileValidated);
+            $profileFields = array_diff_key($validated, array_flip(['name', 'email']));
+            if (!empty($profileFields)) {
+                $profile->update($profileFields);
+            }
 
-            // Handle skills if provided
-            if (isset($profileValidated['skills']) && is_array($profileValidated['skills'])) {
+            // Handle skills
+            if (isset($validated['skills']) && is_array($validated['skills'])) {
                 $skillIds = [];
-                foreach ($profileValidated['skills'] as $skillName) {
+                foreach ($validated['skills'] as $skillName) {
                     $skill = \App\Models\Skill::firstOrCreate(
                         ['name' => $skillName],
                         ['slug' => \Illuminate\Support\Str::slug($skillName)]
@@ -389,12 +425,47 @@ class UserController extends Controller
                 $profile->skills()->sync($skillIds);
             }
 
+            // Get updated data
+            $skills = $profile->fresh()->skills()->pluck('name')->toArray();
+            
+            $profileData = [
+                'id' => $profile->id,
+                'user_id' => $profile->user_id,
+                'first_name' => $profile->first_name,
+                'last_name' => $profile->last_name,
+                'phone' => $profile->phone,
+                'bio' => $profile->bio,
+                'location' => $profile->location,
+                'title' => $profile->title,
+                'education' => $profile->education,
+                'experience_level' => $profile->experience_level,
+                'current_salary' => $profile->current_salary,
+                'expected_salary' => $profile->expected_salary,
+                'employment_status' => $profile->employment_status,
+                'open_to_work' => $profile->open_to_work,
+                'open_to_relocation' => $profile->open_to_relocation,
+                'open_to_remote' => $profile->open_to_remote,
+                'website' => $profile->website,
+                'linkedin' => $profile->linkedin,
+                'github' => $profile->github,
+                'portfolio' => $profile->portfolio,
+                'skills' => $skills,
+                'updated_at' => $profile->updated_at
+            ];
+            
+            $userData = [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'role' => $user->role
+            ];
+
             return response()->json([
                 'success' => true,
                 'message' => 'Profile updated successfully',
                 'data' => [
-                    'user' => $user->fresh(),
-                    'profile' => $profile->fresh()->load('skills')
+                    'user' => $userData,
+                    'profile' => $profileData
                 ]
             ]);
         } catch (\Exception $e) {
@@ -1394,7 +1465,9 @@ class UserController extends Controller
                     ], 404);
                 }
             } else {
-                $company = $user->company;
+                // If the authenticated user has no linked company, fallback to first company
+                // so the dashboard can still render (useful in early/demo environments).
+                $company = $user->company ?: Company::first();
                 if (!$company) {
                     return response()->json([
                         'success' => false,
@@ -1747,6 +1820,36 @@ class UserController extends Controller
                 'success' => false,
                 'message' => 'Failed to remove saved job',
                 'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get available skills for selection
+     */
+    public function getSkills(Request $request)
+    {
+        try {
+            $query = Skill::active()->ordered();
+            
+            // Search functionality
+            if ($request->has('search') && $request->search) {
+                $search = $request->search;
+                $query->where('name', 'like', "%{$search}%");
+            }
+            
+            // Limit results
+            $limit = min($request->get('limit', 20), 50);
+            $skills = $query->limit($limit)->get(['id', 'name', 'category', 'icon', 'color']);
+            
+            return response()->json([
+                'success' => true,
+                'data' => $skills
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch skills: ' . $e->getMessage()
             ], 500);
         }
     }

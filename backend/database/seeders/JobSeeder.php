@@ -35,25 +35,25 @@ class JobSeeder extends Seeder
         $jobs = [
             // Technology Jobs
             [
-                'title' => 'Senior Full Stack Developer',
-                'description' => 'We are looking for an experienced full stack developer to join our team. You will be responsible for developing and maintaining web applications using modern technologies like React, Node.js, and cloud platforms. This role involves working on both frontend and backend systems, collaborating with cross-functional teams, and contributing to architectural decisions.',
-                'company_id' => $companies->where('name', 'FullTimeZ')->first()->id,
-                'category_id' => $categories->where('name', 'Information Technology')->first()->id,
+                'title' => 'Senior UI/UX Designer',
+                'description' => 'We are looking for an experienced UI/UX Designer to join our team. You will be responsible for creating beautiful and intuitive user interfaces for our web and mobile applications.',
+                'company_id' => $companies->where('name', 'Amazon')->first() ? $companies->where('name', 'Amazon')->first()->id : $companies->first()->id,
+                'category_id' => $categories->where('name', 'Design & Creative')->first()->id,
                 'user_id' => 1,
                 'employment_type' => 'full_time',
                 'experience_level' => 'senior',
-                'location_id' => $getLocationId('San Francisco'),
-                'min_salary' => '120000',
-                'max_salary' => '180000',
-                'salary_currency' => 'USD',
-                'salary_period' => 'yearly',
+                'location_id' => $getLocationId('California'),
+                'min_salary' => '250',
+                'max_salary' => '250',
+                'salary_currency' => '$',
+                'salary_period' => 'hourly',
                 'status' => 'active',
-                'benefits' => 'Health insurance, Dental insurance, Vision insurance, 401(k) matching, Flexible work hours, Remote work options, Stock options, Professional development budget',
-                'requirements' => 'Bachelor degree in Computer Science or related field, 5+ years of experience in full stack development, Proficiency in React, Node.js, TypeScript, and database management, Experience with cloud platforms (AWS/Azure), Strong problem-solving and communication skills',
+                'benefits' => 'Health insurance, Dental insurance, Vision insurance, 401(k) matching, Flexible work hours, Remote work options',
+                'requirements' => 'Bachelor degree in Design or related field, 5+ years of UI/UX design experience, Proficiency in Figma, Adobe Creative Suite, and prototyping tools',
                 'remote_work' => true,
-                'positions_available' => 2,
+                'positions_available' => 1,
                 'is_featured' => true,
-                'tags' => ['React', 'Node.js', 'TypeScript', 'AWS', 'Full Stack']
+                'tags' => ['UI / UX Design', 'Web Developer', 'SEO', 'Web Design']
             ],
             [
                 'title' => 'Frontend Developer',

@@ -144,8 +144,8 @@ class JobController extends Controller
                 'title' => 'required|string|max:255',
                 'description' => 'required|string',
                 'company_id' => 'required|exists:companies,id',
-                'category_id' => 'required|exists:categories,id',
-                'employment_type' => 'required|in:full_time,part_time,contract,internship,remote',
+                'category_id' => 'required|exists:job_categories,id',
+                'employment_type' => 'required|in:full_time,part_time,contract,internship,remote,freelance,temporary',
                 'experience_level' => 'required|in:entry,junior,mid,senior,expert',
                 'location' => 'required|string|max:255',
                 'min_salary' => 'nullable|numeric',
@@ -159,6 +159,18 @@ class JobController extends Controller
             ]);
             \Log::info('Validation passed', $validated);
 
+            // Find or create location based on location string
+            $location = \App\Models\JobLocation::firstOrCreate(
+                ['city' => $validated['location']],
+                [
+                    'city' => $validated['location'],
+                    'state' => null,
+                    'country' => 'Unknown',
+                    'slug' => \Str::slug($validated['location']),
+                    'is_active' => true
+                ]
+            );
+
             // Create job with admin user
             $job = Job::create([
                 'title' => $validated['title'],
@@ -168,7 +180,7 @@ class JobController extends Controller
                 'user_id' => $request->user()->id,
                 'employment_type' => $validated['employment_type'],
                 'experience_level' => $validated['experience_level'],
-                'location_id' => 1, // Default location ID
+                'location_id' => $location->id,
                 'min_salary' => $validated['min_salary'],
                 'max_salary' => $validated['max_salary'],
                 'salary_currency' => $validated['salary_currency'] ?? 'USD',

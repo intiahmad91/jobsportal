@@ -47,6 +47,7 @@ class JobService
                 'location_id' => $locationId,
                 'employment_type' => $data['employment_type'],
                 'experience_level' => $data['experience_level'],
+                'education_level' => $data['education_level'] ?? null,
                 'min_salary' => $data['min_salary'] ?? null,
                 'max_salary' => $data['max_salary'] ?? null,
                 'salary_currency' => $data['salary_currency'] ?? 'USD',

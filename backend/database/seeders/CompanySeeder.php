@@ -74,6 +74,18 @@ class CompanySeeder extends Seeder
                 'status' => 'active',
                 'user_id' => 1,
             ],
+         [
+                'name' => 'Amazon',
+                'description' => 'Global e-commerce and cloud computing company',
+                'website' => 'https://amazon.com',
+                'email' => 'careers@amazon.com',
+                'phone' => '+1-555-0999',
+                'address' => '410 Terry Avenue North, Seattle, WA 98109',
+                'industry' => 'Technology',
+                'founded_year' => 1994,
+                'status' => 'active',
+                'user_id' => 1,
+            ],
         ];
 
         foreach ($companies as $company) {

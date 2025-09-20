@@ -28,7 +28,6 @@ class Job extends Model
         'responsibilities',
         'benefits',
         'category_id',
-        'location',
         'location_id',
         'job_type',
         'experience_level',
